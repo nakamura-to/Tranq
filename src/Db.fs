@@ -1,0 +1,741 @@
+﻿//----------------------------------------------------------------------------
+//
+// Copyright (c) 2013 The Tranq Team. 
+//
+// This source code is subject to terms and conditions of the Apache License, Version 2.0. A 
+// copy of the license can be found in the License.txt file at the root of this distribution. 
+// By using this source code in any fashion, you are agreeing to be bound 
+// by the terms of the Apache License, Version 2.0.
+//
+// You must not remove this notice, or any other, from this software.
+//----------------------------------------------------------------------------
+
+namespace Tranq
+
+open System
+open System.Collections
+open System.Collections.Concurrent
+open System.Collections.Generic
+open System.ComponentModel
+open System.Data
+open System.Data.Common
+open System.Dynamic
+open System.Runtime.InteropServices
+open System.Text
+open Microsoft.FSharp.Reflection
+open Microsoft.FSharp.Text.Lexing
+
+exception OptimisticLockError of PreparedStatement with
+  override this.Message =
+    match this :> exn with
+    | OptimisticLockError(stmt) -> 
+      let message = SR.TRANQ4013 (stmt.Text, stmt.Params)
+      Message.format message
+    | _ -> 
+      Unchecked.defaultof<_>
+
+exception UniqueConstraintError of PreparedStatement * string * exn with
+  override this.Message =
+    match this :> exn with
+    | UniqueConstraintError(stmt, message, _) -> 
+      let message = SR.TRANQ4014 (message, stmt.Text, stmt.Params)
+      Message.format message
+    | _ -> 
+      Unchecked.defaultof<_>
+
+type DbException (message, ?innerException:exn) =
+  inherit InvalidOperationException (Message.format message, match innerException with Some ex -> ex | _ -> null)
+  member this.MessageId = message.Id
+
+module internal DbHelper =
+
+  let convertFromDbToClr (dialect: IDialect) dbValue destType udtTypeName prop exnHandler =
+    try
+      dialect.ConvertFromDbToClr(dbValue, destType, udtTypeName, prop)
+    with
+    | exn ->
+      exnHandler exn
+
+  let convertFromColumnToProp dialect (propMeta:PropMeta) (dbValue:obj) =
+    convertFromDbToClr dialect dbValue propMeta.Type null propMeta.Property (fun exn ->
+        let typ = if dbValue = null then typeof<obj> else dbValue.GetType()
+        raise <| DbException(SR.TRANQ4017(typ.FullName, propMeta.ColumnName, propMeta.Type.FullName, propMeta.PropName), exn) )
+
+  let createColumnIndexes (reader:DbDataReader) =
+    let length = reader.FieldCount
+    let columnIndexes = Dictionary<string, ResizeArray<int>>(length, StringComparer.InvariantCultureIgnoreCase) :> IDictionary<string, ResizeArray<int>>
+    for i in 0 .. length - 1 do
+      let name = reader.GetName(i)
+      match columnIndexes.TryGetValue(name) with
+      | true, indexes ->
+        indexes.Add(i) |> ignore;
+      | _ ->
+        let indexes = new ResizeArray<int>()
+        indexes.Add(i) |> ignore
+        columnIndexes.[name] <- indexes
+    let result = Dictionary<string, int>(length, StringComparer.InvariantCultureIgnoreCase) :> IDictionary<string, int>
+    columnIndexes |> Seq.iter (fun (KeyValue(name, indexes)) -> 
+      indexes |> Seq.iteri (fun i columnIndex -> 
+        let uniqueName = if i = 0 then name else name + string i
+        result.[uniqueName] <- columnIndex))
+    result
+
+  let createPropMappings (entityMeta:EntityMeta) (columnIndexes:IDictionary<string, int>) =
+    let propMappings = Array.zeroCreate entityMeta.PropMetaList.Length
+    entityMeta.PropMetaList
+    |> List.iteri (fun i propMeta -> 
+      propMappings.[i] <-
+        match columnIndexes.TryGetValue propMeta.ColumnName with
+        | true, columnIndex -> propMeta, Some columnIndex
+        | _ -> propMeta, None )
+    propMappings
+
+  let makeEntity<'T> (dialect: IDialect) (entityMeta:EntityMeta) (propMappings:(PropMeta * int option) array) (reader:DbDataReader) = 
+    let propArray = Array.zeroCreate propMappings.Length
+    propMappings 
+    |> Array.iter (fun (propMeta, columnIndex) -> 
+       let dbValue =
+         match columnIndex with
+         | Some columnIndex -> dialect.GetValue(reader, columnIndex, propMeta.Property)
+         | _ -> Convert.DBNull
+       propArray.[propMeta.Index] <- convertFromColumnToProp dialect propMeta dbValue)
+    entityMeta.MakeEntity propArray
+
+  let makeEntityList<'T> (dialect: IDialect) entityMeta reader = 
+    let columnIndexes = createColumnIndexes reader
+    let propMappings = createPropMappings entityMeta columnIndexes
+    seq { 
+      while reader.Read() do
+        yield makeEntity dialect entityMeta propMappings reader }
+    |> Seq.cast<'T>
+
+  let makeTupleList<'T> dialect (tupleMeta:TupleMeta) (reader:DbDataReader) = 
+    let fieldCount = reader.FieldCount
+    if fieldCount < tupleMeta.BasicElementMetaList.Length then 
+      raise <| DbException(SR.TRANQ4010())
+    let columnIndexes = createColumnIndexes reader
+    let entityMappings =
+      tupleMeta.EntityElementMetaList 
+      |> List.map (fun elMeta ->
+        let propMappings = createPropMappings elMeta.EntityMeta columnIndexes
+        elMeta, propMappings)
+    let convertFromColumnToElement (elMeta:BasicElementMeta) (dbValue:obj) =
+      convertFromDbToClr dialect dbValue elMeta.Type null null (fun exn ->
+        let typ = if dbValue = null then typeof<obj> else dbValue.GetType()
+        raise <| DbException(SR.TRANQ4018(typ.FullName, elMeta.Index, elMeta.Type.FullName, elMeta.Index), exn) )
+    seq { 
+      while reader.Read() do
+        let tupleAry = Array.zeroCreate (tupleMeta.BasicElementMetaList.Length + tupleMeta.EntityElementMetaList.Length)
+        tupleMeta.BasicElementMetaList
+        |> Seq.map (fun elMeta -> elMeta, dialect.GetValue(reader, elMeta.Index, null))
+        |> Seq.map (fun (elMeta, dbValue) -> elMeta, convertFromColumnToElement elMeta dbValue)
+        |> Seq.iter (fun (elMeta, value) -> tupleAry.[elMeta.Index] <- value)
+        for elMeta, propMappings in entityMappings do
+          tupleAry.[elMeta.Index] <- makeEntity dialect elMeta.EntityMeta propMappings reader
+        yield tupleMeta.MakeTuple(tupleAry) }
+    |> Seq.cast<'T>
+
+  let makeSingleList<'T> dialect typ (reader:DbDataReader) = 
+    let convertFromColumnToReturn (dbValue:obj) =
+      convertFromDbToClr dialect dbValue typ null null (fun exn ->
+        let typ = if dbValue = null then typeof<obj> else dbValue.GetType()
+        raise <| DbException(SR.TRANQ4019(typ.FullName, typ.FullName), exn) )
+    seq { 
+      while reader.Read() do
+        let dbValue = dialect.GetValue(reader, 0, null)
+        yield convertFromColumnToReturn dbValue }
+    |> Seq.cast<'T>
+
+  let remakeEntity<'T> (entity:'T, entityMeta:EntityMeta) propHandler =
+    entityMeta.PropMetaList
+    |> Seq.map (fun propMeta -> propMeta, propMeta.GetValue(upcast entity))
+    |> Seq.map propHandler
+    |> Seq.toArray
+    |> entityMeta.MakeEntity :?> 'T
+
+  let getEntityMeta<'T> dialect =
+    EntityMeta.make typeof<'T> dialect
+
+  let convertFromColumnToPropIfNecessary dialect (dbValueMap:Map<int, obj>) (propMeta:PropMeta, value) =
+    match dbValueMap.TryFind propMeta.Index with
+    | Some dbValue -> convertFromColumnToProp dialect propMeta dbValue
+    | _ -> value
+
+  let appendPreparedStatements stmt1 stmt2 =
+    let text = stmt1.Text + "; " + stmt2.Text
+    let formattedText = stmt1.FormattedText + "; " + stmt2.FormattedText
+    let parameters = 
+      List.append (stmt1.Params) (stmt2.Params)
+    { Text = text; FormattedText = formattedText; Params = parameters } 
+
+  let prepareVersionSelect (dialect: IDialect) entity (entityMeta:EntityMeta) (versionPropMeta:PropMeta) =
+    let idMetaList = 
+      entityMeta.IdPropMetaList
+      |> List.map (fun propMeta -> 
+        propMeta.ColumnName, propMeta.GetValue(entity), propMeta.Type)
+    dialect.PrepareVersionSelect(entityMeta.TableName, versionPropMeta.ColumnName, idMetaList)
+
+  let initVersionValue (dialect: IDialect) value typ =
+    let init v t compose decompose =
+      if not <| Type.isNumber t then
+        raise <| DbException(SR.TRANQ4030 t.FullName)
+      if v = box null || Number.lessThan(decompose v, 1) then 
+        Number.one t |> compose |> Some
+      else 
+        None
+    let conv v t =
+      match dialect.DataConvRepo.TryGet(t) with
+      | Some(basicType, compose, decompose) ->
+        if Type.isOption basicType then
+          let element, elementType = Option.getElement basicType (decompose v)
+          init element elementType (Option.make basicType) id
+          |> Option.map compose
+        else
+          init v basicType compose decompose
+      | _ -> init v t id id
+    if Type.isOption typ then
+      let element, elementType = Option.getElement typ value 
+      conv element elementType
+      |> Option.map (Option.make typ)
+    else 
+      conv value typ
+
+  let incrVersionValue (dialect: IDialect) value typ =
+    let incr v t compose decompose =
+      if not <| Type.isNumber t then
+        raise <| DbException(SR.TRANQ4029 t.FullName)
+      let num =
+        if v = box null then
+          Number.one t
+        else 
+          Number.incr (decompose v)
+      compose num
+    let conv v t =
+      match dialect.DataConvRepo.TryGet(t) with
+      | Some(basicType, compose, decompose) ->
+        if Type.isOption basicType then
+          let element, elementType = Option.getElement basicType (decompose v)
+          incr element elementType ((Option.make basicType) >> compose) id
+        else
+          incr v basicType compose decompose
+      | _ -> incr v t id id
+    if Type.isOption typ then
+      let element, elementType = Option.getElement typ value
+      let value = conv element elementType 
+      Option.make typ value
+    else 
+      conv value typ
+
+  let raiseTooManyAffectedRowsError stmt rows =
+    raise <| DbException(SR.TRANQ4012 (rows, stmt.Text, stmt.Params))
+
+  let raiseNoAffectedRowError {Text = text; Params = parameters} =
+    raise <| DbException(SR.TRANQ4011 (text, parameters))
+
+  let raiseEntityNotFoundError {Text = text; Params = paramerters} =
+    raise <| DbException(SR.TRANQ4015(text, paramerters))
+
+module internal Exec =
+
+  let setupCommand {Config = {Dialect = dialect}; Transaction = tx} (stmt:PreparedStatement) (command:DbCommand) =
+    Option.iter (fun tx -> command.Transaction <- tx) tx
+    command.CommandText <- stmt.Text
+    stmt.Params
+    |> List.iter (fun param ->
+      let dbParam = command.CreateParameter()
+      dialect.SetupDbParameter(param, dbParam)
+      command.Parameters.Add dbParam |> ignore )
+    dialect.MakeParametersDisposer command
+
+  let handleCommand (dialect: IDialect) (stmt:PreparedStatement) command commandHandler =
+    try
+      commandHandler command
+    with
+    | ex -> 
+      if dialect.IsUniqueConstraintViolation(ex) then
+        raise <| UniqueConstraintError (stmt, ex.Message, ex)
+      else 
+        reraise()
+
+  let execute ({Config = {Dialect = dialect; Logger = logger}; Connection = con} as ctx) stmt commandHandler = 
+    seq {
+      use command = con.CreateCommand()
+      use paramsDisposer = setupCommand ctx stmt command
+      logger stmt
+      yield! handleCommand dialect stmt command commandHandler }
+
+  let executeCommand<'T> ctx stmt (commandHandler:DbCommand -> 'T) = 
+    execute ctx stmt (fun command -> seq { yield commandHandler command })
+    |> Seq.head
+
+  let executeReader<'T> ({Config = {Dialect = dialect}} as ctx) stmt (readerHandler: DbDataReader -> 'T seq) = 
+    execute ctx stmt (fun command -> seq { 
+      use reader = handleCommand dialect stmt command (fun command -> command.ExecuteReader())
+      if not dialect.IsHasRowsPropertySupported || reader.HasRows then
+        yield! readerHandler reader
+      else
+        yield! Seq.empty })
+
+  let executeReaderAndScalar<'T> ({Config = {Dialect = dialect; Logger = logger}} as ctx) readerStmt (readerHandler: DbDataReader -> 'T seq) scalarStmt = 
+    executeCommand ctx readerStmt (fun command -> 
+      let results =
+        use reader = handleCommand dialect readerStmt command (fun command -> command.ExecuteReader())
+        if not dialect.IsHasRowsPropertySupported || reader.HasRows then
+          List.ofSeq (readerHandler reader)
+        else
+          []
+      use command = command.Connection.CreateCommand()
+      use paramsDisposer = setupCommand ctx scalarStmt command
+      logger scalarStmt
+      let scalarResult = handleCommand dialect scalarStmt command (fun command -> command.ExecuteScalar())
+      results, scalarResult )
+
+  let executeReaderWitUserHandler ({Config = {Dialect = dialect}} as ctx) stmt handler =
+    executeCommand ctx stmt (fun command -> 
+      use reader = handleCommand dialect stmt command (fun command -> command.ExecuteReader())
+      handler reader )
+
+  let executeNonQuery ctx stmt =
+    executeCommand ctx stmt (fun command -> command.ExecuteNonQuery())
+
+  let executeScalar ctx stmt =
+    executeCommand ctx stmt (fun command -> command.ExecuteScalar())
+
+  let executeAndGetFirst<'T> ctx stmt (readerHandler: DbDataReader -> 'T seq) =
+    let results = 
+      executeReader<'T> ctx stmt (fun reader -> Seq.truncate 1 (readerHandler reader))
+      |> Seq.toList
+    if results.IsEmpty then
+      DbHelper.raiseNoAffectedRowError stmt
+    else
+      results.Head
+
+  let executeAndGetVersionAtOnce ctx dialect entity (entityMeta:EntityMeta) (versionPropMeta:PropMeta) stmt =
+    let versionStmt = DbHelper.prepareVersionSelect dialect entity entityMeta versionPropMeta
+    let stmt = DbHelper.appendPreparedStatements stmt versionStmt
+    let readerHandler (reader:DbDataReader) =
+      seq { while reader.Read() do yield dialect.GetValue(reader, 0, versionPropMeta.Property) }
+    executeAndGetFirst<_> ctx stmt readerHandler
+
+  let getVersionOnly ctx dialect entity (entityMeta:EntityMeta) (versionPropMeta:PropMeta) =
+    let stmt = DbHelper.prepareVersionSelect dialect entity entityMeta versionPropMeta
+    let readerHandler (reader:DbDataReader) =
+      seq { while reader.Read() do yield dialect.GetValue(reader, 0, versionPropMeta.Property) }
+    executeAndGetFirst<_> ctx stmt readerHandler
+
+[<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module internal Script =
+
+  let internal getReaderHandler<'T> dialect =
+    let typ = typeof<'T>
+    if Type.isRecord typ then
+      let meta = EntityMeta.make typ dialect
+      fun reader -> DbHelper.makeEntityList<'T> dialect meta reader
+    elif Type.isTuple typ then
+      let meta = TupleMeta.make typ dialect
+      fun reader -> DbHelper.makeTupleList<'T> dialect meta reader
+    elif Type.isBasic typ then
+      fun reader -> DbHelper.makeSingleList<'T> dialect typ reader
+    else
+      raise <| DbException(SR.TRANQ4028())
+
+  let query<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters = 
+    let handler = getReaderHandler<'T> dialect
+    let stmt = Sql.prepare dialect sql parameters
+    Exec.executeReader<'T> ctx stmt handler
+
+  let paginate<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters (offset, limit) = 
+    let handler = getReaderHandler<'T> dialect
+    let stmt = Sql.preparePaginate dialect sql parameters offset limit
+    Exec.executeReader<'T> ctx stmt handler
+
+  let paginateAndCount<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters (offset, limit)  = 
+    let readerHandler = getReaderHandler<'T> dialect
+    let pagenageStmt, countStmt = Sql.preparePaginateAndCount dialect sql parameters offset limit
+    let results, count = Exec.executeReaderAndScalar<'T> ctx pagenageStmt readerHandler countStmt
+    results |> Seq.toList, Convert.ChangeType(count, typeof<int64>) :?> int64
+
+  let execute ({Config = {Dialect = dialect}} as ctx) sql parameters  = 
+    let stmt = Sql.prepare dialect sql parameters
+    Exec.executeNonQuery ctx stmt
+
+  let executeReader<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters handler = 
+    let stmt = Sql.prepare dialect sql parameters
+    Exec.executeReader<'T> ctx stmt handler
+
+[<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module internal Auto =
+
+  type FindResult<'T> = Found of 'T | NotFound of PreparedStatement
+
+  let private validateType<'T> =
+    if not <| Type.isRecord typeof<'T> then
+      raise <| DbException(SR.TRANQ4002())
+
+  let private get<'T when 'T : not struct> ({Dialect = dialect}) idList  = 
+    if List.isEmpty idList then
+      raise <| DbException(SR.TRANQ4004 ())
+    let readerHandler, entityMeta = 
+      let typ = typeof<'T>
+      let entityMeta = EntityMeta.make typ dialect
+      if entityMeta.IdPropMetaList.IsEmpty then
+        raise <| DbException(SR.TRANQ4005 (typ.FullName))
+      elif entityMeta.IdPropMetaList.Length <> idList.Length then
+        raise <| DbException(SR.TRANQ4003 (entityMeta.IdPropMetaList.Length, idList.Length))
+      DbHelper.makeEntityList<'T> dialect entityMeta, entityMeta
+    let stmt = Sql.prepareFind dialect idList entityMeta
+    stmt, readerHandler, entityMeta
+
+  let tryFind<'T when 'T : not struct> ({Config = config} as ctx) idList = 
+    validateType<'T>
+    let stmt, readerHandler, entityMeta = get<'T> config idList
+    let results = Exec.executeReader ctx stmt readerHandler
+    use enumerator = results.GetEnumerator()
+    if enumerator.MoveNext() then
+      let entity = enumerator.Current
+      if enumerator.MoveNext() then
+        raise <| DbException(SR.TRANQ4016 (stmt.Text, stmt.Params)) 
+      else
+        Found entity
+    else
+      NotFound stmt
+
+  let private validateOptimisticLock version entity (versionPropMeta:PropMeta option) stmt =
+    match versionPropMeta with
+    | Some versionPropMeta ->
+      let actualVersion = versionPropMeta.GetValue (upcast entity)
+      if actualVersion = null || not <| actualVersion.Equals(version) then
+        raise <| OptimisticLockError stmt
+    | _ -> 
+      raise <| OptimisticLockError stmt
+
+  let tryFindWithVersion<'T when 'T : not struct> ({Config = config} as ctx) idList version = 
+    validateType<'T>
+    let stmt, readerHandler, entityMeta = get<'T> config idList
+    let results = Exec.executeReader<'T> ctx stmt readerHandler
+    use enumerator = results.GetEnumerator()
+    if enumerator.MoveNext() then
+      let entity = enumerator.Current
+      if enumerator.MoveNext() then
+        raise <| DbException(SR.TRANQ4016 (stmt.Text, stmt.Params)) 
+      else
+        validateOptimisticLock version entity entityMeta.VersionPropMeta stmt
+        Found entity
+    else
+      NotFound stmt
+
+  let private preInsert<'T> ({Config = {Dialect = dialect}} as ctx) (entity:'T) (entityMeta:EntityMeta) =
+    let contextKey = ctx.Connection.ConnectionString
+    let (|Sequence|_|) = function
+      | GetSequenceAndInitVersion(idPropMeta, sequenceMeta, _)
+      | GetSequence(idPropMeta, sequenceMeta) -> 
+        let stmt = dialect.PrepareSequenceSelect (sequenceMeta.SqlSequenceName)
+        let dbValue = sequenceMeta.Generate contextKey (fun () -> Exec.executeScalar ctx stmt)
+        let value = DbHelper.convertFromColumnToProp dialect idPropMeta dbValue
+        Some (value, idPropMeta)
+      | _ -> None
+    let (|Version|_|) = function
+      | GetSequenceAndInitVersion(_, _, versionPropMeta)
+      | InitVersion(versionPropMeta) -> 
+        let value = versionPropMeta.GetValue (upcast entity)
+        let typ = versionPropMeta.Type
+        match DbHelper.initVersionValue dialect value typ with
+        | Some value -> Some(value, versionPropMeta) 
+        | _ -> None
+      | _ -> None
+    match entityMeta.PreInsertCase with
+    | Some preInsertCase -> 
+      match preInsertCase with
+      | Sequence(idValue, idPropMeta) & Version(versionValue, versionPropMeta) -> 
+        DbHelper.remakeEntity<'T> (entity, entityMeta) (fun (propMeta:PropMeta, value) ->
+          if propMeta.Index = idPropMeta.Index then idValue
+          elif propMeta.Index = versionPropMeta.Index then versionValue
+          else value )
+      | Sequence(idValue, idPropMeta) -> 
+        DbHelper.remakeEntity<'T> (entity, entityMeta) (fun (propMeta:PropMeta, value) ->
+          if propMeta.Index = idPropMeta.Index then idValue
+          else value )
+      | Version(versionValue, versionPropMeta) -> 
+        DbHelper.remakeEntity<'T> (entity, entityMeta) (fun (propMeta:PropMeta, value) ->
+          if propMeta.Index = versionPropMeta.Index then versionValue
+          else value )
+      | _ -> entity
+    | _ -> entity
+
+  let insert<'T when 'T : not struct> ({Config = {Dialect = dialect}} as ctx) (entity:'T) (opt:InsertOpt) =
+    validateType<'T>
+    let entityMeta = DbHelper.getEntityMeta<'T> dialect
+    let entity = preInsert<'T> ctx entity entityMeta
+    let stmt = Sql.prepareInsert dialect entity entityMeta opt
+    let makeEntity dbValueMap =
+      DbHelper.remakeEntity<'T> (entity, entityMeta) (DbHelper.convertFromColumnToPropIfNecessary dialect dbValueMap)
+    let insert() =
+      let rows = Exec.executeNonQuery ctx stmt
+      if rows < 1 then 
+        DbHelper.raiseNoAffectedRowError stmt
+      elif 1 < rows then
+        DbHelper.raiseTooManyAffectedRowsError stmt rows
+    match entityMeta.InsertCase with
+    | Insert_GetIdentityAndVersionAtOnce(idPropMeta, versionPropMeta) -> 
+      let identityStmt = 
+        dialect.PrepareIdentityAndVersionSelect(entityMeta.TableName, idPropMeta.ColumnName, versionPropMeta.ColumnName)
+      let stmt = DbHelper.appendPreparedStatements stmt identityStmt
+      let readerHandler (reader:DbDataReader) =
+        seq { while reader.Read() 
+                do yield dialect.GetValue(reader, 0, idPropMeta.Property), 
+                         dialect.GetValue(reader, 1, versionPropMeta.Property) }
+      let idValue, versionValue = Exec.executeAndGetFirst<_> ctx stmt readerHandler
+      makeEntity <| Map.ofList [idPropMeta.Index, idValue; versionPropMeta.Index, versionValue]
+    | Insert_GetIentityAtOnce(idPropMeta) ->
+      let identityStmt = dialect.PrepareIdentitySelect(entityMeta.TableName, idPropMeta.ColumnName)
+      let stmt = DbHelper.appendPreparedStatements stmt identityStmt
+      let readerHandler (reader:DbDataReader) =
+        seq { while reader.Read() do yield dialect.GetValue(reader, 0, idPropMeta.Property) }
+      let idValue = Exec.executeAndGetFirst ctx stmt readerHandler
+      makeEntity <| Map.ofList [idPropMeta.Index, idValue]
+    | Insert_GetVersionAtOnce(versionPropMeta) -> 
+      let versionValue = Exec.executeAndGetVersionAtOnce ctx dialect entity entityMeta versionPropMeta stmt
+      makeEntity <| Map.ofList [versionPropMeta.Index, versionValue]
+    | Insert_GetIdentityAndVersionLater(idPropMeta, versionPropMeta) -> 
+      insert()
+      let stmt = dialect.PrepareIdentityAndVersionSelect(entityMeta.TableName, idPropMeta.ColumnName, versionPropMeta.ColumnName)
+      let readerHandler (reader:DbDataReader) =
+        seq { while reader.Read() 
+                do yield dialect.GetValue(reader, 0, idPropMeta.Property), 
+                         dialect.GetValue(reader, 1, versionPropMeta.Property) }
+      let idValue, versionValue = id Exec.executeAndGetFirst ctx stmt readerHandler
+      makeEntity <| Map.ofList [idPropMeta.Index, idValue; versionPropMeta.Index, versionValue]
+    | Insert_GetIdentityLater(idPropMeta) ->
+      insert()
+      let stmt = dialect.PrepareIdentitySelect(entityMeta.TableName, idPropMeta.ColumnName)
+      let readerHandler (reader:DbDataReader) =
+        seq { while reader.Read() do yield dialect.GetValue(reader, 0, idPropMeta.Property) }
+      let idValue = Exec.executeAndGetFirst ctx stmt readerHandler
+      makeEntity <| Map.ofList [idPropMeta.Index, idValue]
+    | Insert_GetVersionLater(versionPropMeta) ->
+      insert()
+      let versionValue = Exec.getVersionOnly ctx dialect entity entityMeta versionPropMeta
+      makeEntity <| Map.ofList [versionPropMeta.Index, versionValue]
+    | Insert ->
+      insert()
+      entity
+
+  let update<'T when 'T : not struct> ({Config = {Dialect = dialect}} as ctx) (entity:'T) (opt:UpdateOpt) =
+    validateType<'T>
+    let entityMeta = DbHelper.getEntityMeta<'T> dialect
+    if entityMeta.IdPropMetaList.IsEmpty then
+      raise <| DbException(SR.TRANQ4005 (typeof<'T>.FullName))
+    let stmt = Sql.prepareUpdate dialect entity entityMeta opt
+    let update () =
+      let rows = Exec.executeNonQuery ctx stmt
+      if rows < 1 then
+        if opt.IgnoreVersion || entityMeta.VersionPropMeta.IsNone then
+          DbHelper.raiseNoAffectedRowError stmt
+        else
+          raise <| OptimisticLockError stmt
+      if 1 < rows then 
+        DbHelper.raiseTooManyAffectedRowsError stmt rows
+    match entityMeta.UpdateCase with
+    | Update_GetVersionAtOnce versionPropMeta ->
+      let versionValue = Exec.executeAndGetVersionAtOnce ctx dialect entity entityMeta versionPropMeta stmt
+      let dbValueMap = Map.ofList [versionPropMeta.Index, versionValue]
+      DbHelper.remakeEntity<'T> (entity, entityMeta) (DbHelper.convertFromColumnToPropIfNecessary dialect dbValueMap)
+    | Update_GetVersionLater versionPropMeta -> 
+      update()
+      let versionValue = Exec.getVersionOnly ctx dialect entity entityMeta versionPropMeta
+      let dbValueMap = Map.ofList [versionPropMeta.Index, versionValue]
+      DbHelper.remakeEntity<'T> (entity, entityMeta) (DbHelper.convertFromColumnToPropIfNecessary dialect dbValueMap)
+    | Update_IncrementVersion versionPropMeta -> 
+      update ()
+      DbHelper.remakeEntity<'T> (entity, entityMeta) (fun (propMeta:PropMeta, value) ->
+        if propMeta.Index = versionPropMeta.Index then
+          DbHelper.incrVersionValue dialect value propMeta.Type
+        else
+          value)
+    | Update ->
+      update ()
+      entity
+
+  let delete<'T when 'T : not struct> ({Config = {Dialect = dialect}} as ctx) (entity:'T) (opt:DeleteOpt) =
+    validateType<'T>
+    let entityMeta = DbHelper.getEntityMeta<'T> dialect
+    if entityMeta.IdPropMetaList.IsEmpty then
+      raise <| DbException(SR.TRANQ4005 (typeof<'T>.FullName))
+    let stmt = Sql.prepareDelete dialect entity entityMeta opt
+    let rows = Exec.executeNonQuery ctx stmt
+    if rows < 1 then 
+      if opt.IgnoreVersion || entityMeta.VersionPropMeta.IsNone then
+        DbHelper.raiseNoAffectedRowError stmt
+      else 
+        raise <| OptimisticLockError stmt
+    if 1 < rows then 
+      DbHelper.raiseTooManyAffectedRowsError stmt rows
+
+  let call<'T when 'T : not struct> ({Config = {Dialect = dialect}} as ctx) (procedure:'T) =
+    validateType<'T>
+    let typ = typeof<'T>
+    let procedureMeta = ProcedureMeta.make typ dialect
+    let stmt = Sql.prepareCall dialect procedure procedureMeta
+    let convertFromDbToClr dbValue (paramMeta:ProcedureParamMeta) =
+      DbHelper.convertFromDbToClr dialect dbValue paramMeta.Type paramMeta.UdtTypeName paramMeta.Property (fun exn ->
+        let typ = if dbValue = null then typeof<obj> else dbValue.GetType()
+        raise <| DbException(SR.TRANQ4023(typ.FullName, paramMeta.ParamName, procedureMeta.ProcedureName, paramMeta.Type.FullName), exn) )
+    Exec.executeCommand ctx stmt (fun command ->
+      command.CommandType <- CommandType.StoredProcedure
+      let procedureAry = Array.zeroCreate (procedureMeta.ProcedureParamMetaList.Length)
+      using (command.ExecuteReader()) (fun reader ->
+        try
+          procedureMeta.ProcedureParamMetaList
+          |> Seq.fold (fun (hasNextResult, reader) paramMeta -> 
+            match paramMeta.ParamMetaCase with
+            | Result (elementCase, typeConverter) -> 
+              if hasNextResult then
+                let resultList =
+                  match elementCase with
+                  | EntityType entityMeta -> DbHelper.makeEntityList dialect entityMeta reader
+                  | TupleType tupleMeta -> DbHelper.makeTupleList dialect tupleMeta reader
+                procedureAry.[paramMeta.Index] <- typeConverter resultList
+              reader.NextResult(), reader
+            | _ ->
+              hasNextResult, reader) (true, reader) 
+          |> ignore
+        finally
+          try
+            while reader.NextResult() do ()
+          with
+          | _ -> () )
+      procedureMeta.ProcedureParamMetaList
+      |> Seq.filter (fun paramMeta -> 
+        match paramMeta.ParamMetaCase with
+        | Result _ -> false
+        | _ -> true )
+      |> Seq.iter (fun paramMeta -> 
+        let paramName = dialect.CreateParameterName paramMeta.ParamName
+        let valueCase =
+          if command.Parameters.Contains(paramName) then
+            let value = command.Parameters.[paramName].Value
+            match paramMeta.ParamMetaCase with
+            | Unit  -> failwith "unreachable."
+            | Input -> value
+            | _ -> convertFromDbToClr value paramMeta
+          else 
+            null
+        procedureAry.[paramMeta.Index] <- valueCase)
+      procedureMeta.MakeProcedure procedureAry :?> 'T )
+
+[<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Db =
+  
+  let query<'T> sql parameters = 
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (sql, "sql") 
+      Guard.argNotNull (parameters, "parameters") 
+      Script.query<'T> ctx sql parameters 
+      |> Success )
+
+  let paginate<'T> sql parameters (offset, limit) = 
+    TxBlock(fun ctx-> 
+      Guard.argNotNull (sql, "sql")
+      Guard.argNotNull (parameters, "parameters") 
+      Script.paginate<'T> ctx sql parameters (offset, limit) 
+      |> Success )
+
+  let paginateAndCount<'T> sql parameters (offset, limit) = 
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (sql, "sql")
+      Guard.argNotNull (parameters, "parameters")
+      Script.paginateAndCount<'T> ctx sql parameters (offset, limit) 
+      |> Success )
+
+  let execute sql parameters = 
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (sql, "sql")
+      Guard.argNotNull (parameters, "parameters")
+      Script.execute ctx sql parameters 
+      |> Success )
+
+  let run sql parameters = 
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (sql, "sql")
+      Guard.argNotNull (parameters, "parameters")
+      Script.execute ctx sql parameters 
+      |> ignore
+      |> Success )
+
+  let executeReader<'T> sql parameters handler =
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (sql, "sql")
+      Guard.argNotNull (parameters, "parameters")
+      Guard.argNotNull (handler, "handler")
+      Script.executeReader<'T> ctx sql parameters handler 
+      |> Success )
+
+  let find<'T when 'T : not struct> id = 
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (id, "id")
+      match Auto.tryFind<'T> ctx id with
+      | Auto.Found value -> Success value
+      | Auto.NotFound stmt -> DbHelper.raiseEntityNotFoundError stmt )
+
+  let tryFind<'T when 'T : not struct> id = 
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (id, "id")
+      match Auto.tryFind<'T> ctx id with
+      | Auto.Found value -> Success (Some value)
+      | Auto.NotFound _ -> Success None )
+
+  let findWithVersion<'T when 'T : not struct> id version = 
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (id, "id")
+      match Auto.tryFindWithVersion<'T> ctx id version with
+      | Auto.Found value -> Success value
+      | Auto.NotFound stmt -> DbHelper.raiseEntityNotFoundError stmt )
+
+  let tryFindWithVersion<'T when 'T : not struct> id version = 
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (id, "id")
+      match Auto.tryFindWithVersion<'T> ctx id version with
+      | Auto.Found value -> Success (Some value)
+      | Auto.NotFound _ -> Success None )
+
+  let insert<'T when 'T : not struct> (entity: 'T) =
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (entity, "entity")
+      Auto.insert ctx entity (InsertOpt()) |> Success )
+
+  let insertWithOpt<'T when 'T : not struct> (entity: 'T) opt =
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (entity, "entity")
+      Guard.argNotNull (opt, "opt") 
+      Auto.insert ctx entity opt |> Success )
+
+  let update<'T when 'T : not struct> (entity: 'T) =
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (entity, "entity")
+      Auto.update ctx entity (UpdateOpt()) |> Success )
+
+  let updateWithOpt<'T when 'T : not struct> (entity: 'T) opt =
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (entity, "entity")
+      Guard.argNotNull (opt, "opt") 
+      Auto.update ctx entity opt |> Success )
+
+  let delete<'T when 'T : not struct> (entity: 'T) =
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (entity, "entity")
+      Auto.delete ctx entity (DeleteOpt()) |> Success )
+
+  let deleteWithOpt<'T when 'T : not struct> (entity: 'T) opt =
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (entity, "entity")
+      Guard.argNotNull (opt, "opt") 
+      Auto.delete ctx entity opt |> Success)
+
+  let call<'T when 'T : not struct> (procedure: 'T) =
+    TxBlock(fun ctx -> 
+      Guard.argNotNull (procedure, "procedure")
+      Auto.call ctx procedure |> Success )
+
