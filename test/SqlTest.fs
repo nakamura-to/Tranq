@@ -1197,7 +1197,7 @@ module SqlTest =
     let dialect = MsSqlDialect(repo)
     // raw type
     assert_equal (NumOpt(Some 1)) (dialect.ConvertFromDbToClr(1, typeof<NumOpt>, null, null))
-    assert_equal null (dialect.ConvertFromDbToClr(Convert.DBNull, typeof<NumOpt>, null, null))
+    assert_equal (NumOpt None) (dialect.ConvertFromDbToClr(Convert.DBNull, typeof<NumOpt>, null, null))
     // option type
     assert_equal (Some(NumOpt(Some 1))) (dialect.ConvertFromDbToClr(1, typeof<NumOpt option>, null, null))
     assert_equal None (dialect.ConvertFromDbToClr(Convert.DBNull, typeof<NumOpt option>, null, null))

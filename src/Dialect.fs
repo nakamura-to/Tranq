@@ -181,9 +181,13 @@ type DialectBase(dataConvRepo) as this =
       Enum.ToObject(enumType, underlyingValue)
     let toRichObject basicType compose dbValue =
       if Type.isOption basicType then
+        let dbValue = if dbValue = null || Convert.IsDBNull(dbValue) then null else dbValue
         compose (Option.make basicType dbValue)
       else
-        compose dbValue
+        if dbValue = null || Convert.IsDBNull(dbValue) then 
+          null
+        else
+          compose dbValue
     match dataConvRepo.TryGet(destType) with
     | Some(basicType, compose, _) ->
       let dbValue = if dbValue = null || Convert.IsDBNull(dbValue) then null else dbValue
