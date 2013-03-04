@@ -254,7 +254,9 @@ type TxContext = {
 
 type TxResult<'R> = Success of 'R | Failure of exn
 
-type TxBlock<'R> = TxBlock of (TxContext -> TxResult<'R>)
+type TxState = { IsRollbackOnly: bool }
+
+type TxBlock<'R> = TxBlock of (TxContext -> TxState -> TxResult<'R> * TxState)
  
 type TxAttr = Required | RequiresNew | Supports | NotSupported
 
@@ -267,18 +269,18 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
     | RepeatableRead -> System.Data.IsolationLevel.RepeatableRead
     | Serializable -> System.Data.IsolationLevel.Serializable
     | Snapshot -> System.Data.IsolationLevel.Snapshot
-  let runTxBlock (TxBlock block) ctx = 
-    block ctx
+  let runTxBlock (TxBlock block) ctx state = 
+    block ctx state
   let confirmOpen (con: DbConnection) =
     if con.State <> ConnectionState.Open then
       con.Open()
     con
-  member this.Return(result) = TxBlock(fun _ -> Success result)
+  member this.Return(result) = TxBlock(fun ctx state -> Success result, state)
   member this.ReturnFrom(m) = m
-  member this.Bind(m, f) = TxBlock(fun ctx -> 
-    match runTxBlock m ctx with
-    | Success out -> runTxBlock (f out) ctx
-    | Failure exn -> Failure exn)
+  member this.Bind(m, f) = TxBlock(fun ctx state -> 
+    match runTxBlock m ctx state with
+    | Success out, state -> runTxBlock (f out) ctx state
+    | Failure exn, state -> Failure exn, state)
   member this.Delay(f) = this.Bind(this.Return(), f)
   member this.Zero() = this.Return()
   member this.Combine(r1, r2) = this.Bind(r1, fun () -> r2)
@@ -299,38 +301,41 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
   member this.For(sequence:seq<_>, body) =
     this.Using(sequence.GetEnumerator(),
       (fun enum -> this.While(enum.MoveNext, this.Delay(fun () ->body enum.Current))))
-  member this.Run(f) = TxBlock(fun ({Config = {ConnectionProvider = provider}; Connection = con; Transaction = tx} as ctx) ->
-    let run ctx = runTxBlock f ctx
-    let completeTx result (tx: DbTransaction) =
+  member this.Run(f) = TxBlock(fun ({Config = {ConnectionProvider = provider}; Connection = con; Transaction = tx} as ctx) state ->
+    let run ctx state = runTxBlock f ctx state
+    let completeTx (tx: DbTransaction) result (state: TxState) =
       match result with
       | Success value -> 
         try
-          tx.Commit()
-          Success value
+          if state.IsRollbackOnly then
+            tx.Rollback()
+          else
+            tx.Commit()
+          Success value, state
         with e ->
-          Failure e
+          Failure e, state
       | Failure exn ->
         try tx.Rollback() with e -> ()
-        Failure exn
+        Failure exn, state
     match txAttr, tx with
     | Required, Some _ -> 
-      run ctx
+      run ctx state
     | Required, None
     | RequiresNew, None ->
       let con = confirmOpen con
       use tx = con.BeginTransaction(toAdoTx level)
-      let result = run {ctx with Connection = con; Transaction = Some tx }
-      completeTx result tx
+      let result, state = run {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
+      completeTx tx result state
     | RequiresNew, Some _ ->
       use con = confirmOpen (provider())
       use tx = con.BeginTransaction(toAdoTx level)
-      let result = run {ctx with Connection = con; Transaction = Some tx }
-      completeTx result tx
+      let result, state = run {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
+      completeTx tx result state
     | Supports, _ ->
-      run ctx
+      run ctx state
     | NotSupported, _ -> 
       use con = confirmOpen (provider())
-      run {ctx with Connection = con; Transaction = None })
+      run {ctx with Connection = con; Transaction = None } {IsRollbackOnly = false})
 
 exception Abort of string
 
@@ -349,17 +354,26 @@ module Operations =
 
   let txNotSupported = TxBlockBuilder(TxAttr.NotSupported, TxIsolationLevel.ReadCommitted)
 
-  let abort e = TxBlock(fun _ -> Failure(e))
+  let abort e = TxBlock(fun _ state -> Failure e, state)
 
   let abortwith message = abort <| Abort message
 
-  let runTxBlock (config: Config) (TxBlock(txBlock)) = 
+  let rollbackOnly() = TxBlock(fun _ _ -> Success (), { IsRollbackOnly = true })
+
+  let runTxBlock (config: Config) (TxBlock(txBlock)) =
+    let state = { IsRollbackOnly = false }
     try
       use con = config.ConnectionProvider()
       let ctx = { 
         Config = config
         Connection = con
         Transaction = None }
-      txBlock ctx
-    with
-      | e -> Failure e
+      txBlock ctx state
+    with e -> 
+      Failure e, state
+
+  let evalTxBlock config txBlock = 
+    runTxBlock config txBlock |> fst
+
+  let execTxBlock config txBlock = 
+    runTxBlock config txBlock |> snd

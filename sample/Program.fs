@@ -92,12 +92,12 @@ let config =
       new SqlConnection("Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;") :> DbConnection
     Logger = fun stmt -> printfn "LOG: %s" stmt.FormattedText }
 
-let run txBlock =
-  match runTxBlock config txBlock with
+let eval txBlock =
+  match evalTxBlock config txBlock with
   | Success ret -> printfn "success: %A\n" ret
   | Failure exn -> printfn "failure: %A\n" exn
 
 [<EntryPoint>]
 let main argv = 
-  run workflow
+  eval workflow
   System.Console.ReadKey() |> fun _ -> 0
