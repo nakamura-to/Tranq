@@ -287,7 +287,7 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
     with e -> runTxBlock (h e) ctx)
   member this.TryFinally(m, compensation) = TxBlock(fun ctx ->
     try runTxBlock m ctx
-    with e -> compensation(); Success())
+    finally compensation())
   member this.Using(res:#IDisposable, body) =
     this.TryFinally(body res, (fun () -> 
       match res with 
