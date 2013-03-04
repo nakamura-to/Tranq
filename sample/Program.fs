@@ -25,80 +25,79 @@ module Version =
     member this.Compose(value) = create value
     member this.Decompose(Version(value)) = value }
 
-type Person = { [<Id>]Id: int; Name: string; Email: Email.t; Age: Age.t; [<Version>]Version: Version.t }
+module Person =
+  [<Table(Name = "Person")>]
+  type t = { [<Id>]Id: int; Name: string; Email: Email.t; Age: Age.t; [<Version>]Version: Version.t }
+  let incrAge person = { person with Age = Age.incr person.Age }
 
-let setup = txSupports { 
-  do! 
-    Db.run "
-      if exists (select * from dbo.sysobjects where id = object_id(N'Person')) drop table Person;
-      create table Person (Id int primary key, Name varchar(20), Email varchar(50), Age int, Version int);
-      " []
-  let! _ = 
-    Db.insert<Person> {
-      Id = 1
-      Name = "hoge"
-      Email = Email.create "hoge@example.com"
-      Age = Age.create <| Some 10
-      Version = Version.create -1 } 
-  let! _ = 
-    Db.insert<Person> {
-      Id = 2
-      Name = "foo"
-      Email = Email.create "foo@example.com"
-      Age = Age.create None
-      Version = Version.create -1 } 
-  let! _ = 
-    Db.insert<Person> {
-      Id = 3
-      Name = "bar"
-      Email = Email.create "bar@example.com"
-      Age = Age.create <| Some 20
-      Version = Version.create -1 } 
-  return ()}
+module Dao =
+  let setup = txSupports { 
+    do! 
+      Db.run "
+        if exists (select * from dbo.sysobjects where id = object_id(N'Person')) drop table Person;
+        create table Person (Id int primary key, Name varchar(20), Email varchar(50), Age int, Version int);
+        " []
+    let! _ = 
+      Db.insert<Person.t> {
+        Id = 1
+        Name = "hoge"
+        Email = Email.create "hoge@example.com"
+        Age = Age.create <| Some 10
+        Version = Version.create -1 } 
+    let! _ = 
+      Db.insert<Person.t> {
+        Id = 2
+        Name = "foo"
+        Email = Email.create "foo@example.com"
+        Age = Age.create None
+        Version = Version.create -1 } 
+    let! _ = 
+      Db.insert<Person.t> {
+        Id = 3
+        Name = "bar"
+        Email = Email.create "bar@example.com"
+        Age = Age.create <| Some 20
+        Version = Version.create -1 } 
+    return ()}
 
-let queryAll () = txSupports {
-  let! persons = Db.query<Person> "select * from Person" []
-  return persons }
+  let queryPersonAll () = txSupports {
+    return! Db.query<Person.t> "select * from Person" [] }
 
-let queryByName (name: string) = txSupports {
-  return! Db.query<Person> "select * from Person where Name = @name" ["@name" <-- name]}
+  let queryPersonByName (name: string) = txSupports {
+    return! Db.query<Person.t> "select * from Person where Name = @name" ["@name" <-- name]}
 
-let update person = txSupports {
-  let! _ = Db.update<Person> person
-  return ()}
+  let updatePerson person = txSupports {
+    let! _ = Db.update<Person.t> person
+    return ()}
 
-let txMain = txRequired {
-  do! setup
-  let! persons = queryAll()
-  let persons = 
-    persons 
-    |> Seq.map (fun p -> { p with Age = Age.incr p.Age })
-    // ideally `Seq.toList` is unneccessary, but current implementation requires it cause of a bug 
-    |> Seq.toList 
-  for p in persons do
-    do! update p
-  let! persons = queryAll()
-  return Seq.toList persons }
+let workflow = txRequired {
+  do! Dao.setup
+  let! persons = Dao.queryPersonAll()
+  for p in persons |> Seq.map Person.incrAge do
+    do! Dao.updatePerson p
+  let! p1 = Dao.queryPersonByName "hoge"
+  let! p2 = Dao.queryPersonByName "foo"
+  let! p3 = Dao.queryPersonByName "bar"
+  return [p1; p2; p3] }
 
-let dataConvRepo =
-  let repo = DataConvRepo()
-  repo.Add(Email.conv)
-  repo.Add(Age.conv)
-  repo.Add(Version.conv)
-  repo
-  
-let config = {
-  Dialect = MsSqlDialect(dataConvRepo)
-  ConnectionProvider = fun () -> 
-    new SqlConnection("Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;") :> DbConnection
-  Logger = fun stmt -> printfn "LOG: %s" stmt.FormattedText }
+let config = 
+  let dataConvRepo =
+    let repo = DataConvRepo()
+    repo.Add(Email.conv)
+    repo.Add(Age.conv)
+    repo.Add(Version.conv)
+    repo
+  { Dialect = MsSqlDialect(dataConvRepo)
+    ConnectionProvider = fun () -> 
+      new SqlConnection("Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;") :> DbConnection
+    Logger = fun stmt -> printfn "LOG: %s" stmt.FormattedText }
 
 let run txBlock =
   match runTxBlock config txBlock with
-  | Success r -> printfn "success: %A\n" r
+  | Success ret -> printfn "success: %A\n" ret
   | Failure exn -> printfn "failure: %A\n" exn
 
 [<EntryPoint>]
 let main argv = 
-  run txMain
+  run workflow
   System.Console.ReadKey() |> fun _ -> 0

@@ -303,9 +303,15 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
     let run ctx = runTxBlock f ctx
     let completeTx result (tx: DbTransaction) =
       match result with
-      | Success _ -> tx.Commit()
-      | Failure _ -> tx.Rollback()
-      result
+      | Success value -> 
+        try
+          tx.Commit()
+          Success value
+        with e ->
+          Failure e
+      | Failure exn ->
+        try tx.Rollback() with e -> ()
+        Failure exn
     match txAttr, tx with
     | Required, Some _ -> 
       run ctx
