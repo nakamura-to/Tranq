@@ -266,19 +266,15 @@ type TxIsolationLevel = ReadUncommitted | ReadCommitted | RepeatableRead | Seria
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module TxBlock =
 
-  let run (TxBlock block) ctx state = 
+  let inline run (TxBlock block) ctx state = 
     block ctx state
 
-  let returnM x = TxBlock(fun ctx state -> Success x, state)
+  let inline returnM x = TxBlock(fun ctx state -> Success x, state)
   
-  let bind f m = TxBlock(fun ctx state -> 
+  let inline bindM m f = TxBlock(fun ctx state -> 
     match run m ctx state with
     | Success out, state -> run (f out) ctx state
     | Failure exn, state -> Failure exn, state)
-
-  let lift f m =
-    let ret x = returnM (f x)
-    bind ret m
 
 type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
   let toAdoTx = function
@@ -293,7 +289,7 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
     con
   member this.Return(x) = TxBlock.returnM x
   member this.ReturnFrom(m) = m
-  member this.Bind(m, f) = TxBlock.bind f m
+  member this.Bind(m, f) = TxBlock.bindM m f
   member this.Delay(f) = this.Bind(this.Return(), f)
   member this.Zero() = this.Return()
   member this.Combine(r1, r2) = this.Bind(r1, fun () -> r2)
@@ -309,11 +305,10 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
       | null -> () 
       | disp -> disp.Dispose()))
   member this.While(guard, m) =
-    if not(guard()) then this.Zero() 
-    else this.Bind(m, (fun () -> this.While(guard, m)))
+    this.Bind(m, (fun () -> this.While(guard, m)))
   member this.For(sequence:seq<_>, body) =
     this.Using(sequence.GetEnumerator(),
-      (fun enum -> this.While(enum.MoveNext, this.Delay(fun () ->body enum.Current))))
+      (fun enum -> this.While(enum.MoveNext, this.Delay(fun () -> body enum.Current))))
   member this.Run(f) = TxBlock(fun ({Config = {ConnectionProvider = provider}; Connection = con; Transaction = tx} as ctx) state ->
     let run ctx state = TxBlock.run f ctx state
     let completeTx (tx: DbTransaction) result (state: TxState) =
@@ -329,7 +324,7 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
           Failure e, state
       | Failure exn ->
         try tx.Rollback() with e -> ()
-        Failure exn, state
+        Failure exn, state 
     match txAttr, tx with
     | Required, Some _ -> 
       run ctx state
@@ -357,9 +352,32 @@ module Operations =
 
   let inline (<--) (name:string) (value:'T) = Param(name, box value, typeof<'T>)
 
-  let inline (<!>) f m = TxBlock.lift f m
+  let inline returnM m = TxBlock.returnM m
 
-  let inline (|!>) m f = TxBlock.lift f m
+  let inline applyM f m =
+    TxBlock.bindM f <| fun f' ->
+      TxBlock.bindM m <| fun m' ->
+        returnM (f' m') 
+
+  let inline (<*>) f m = applyM f m
+
+  let inline liftM f m =
+    let ret x = returnM (f x)
+    TxBlock.bindM m ret
+
+  let inline liftM2 f x y = returnM f <*> x <*> y
+
+  let inline private cons hd tl = hd :: tl
+    
+  let inline sequence s =
+    let inline cons a b = liftM2 (cons) a b
+    List.foldBack cons s (returnM [])
+
+  let inline mapM f x = sequence (List.map f x)
+
+  let inline (<!>) f m = liftM f m
+
+  let inline (|!>) m f = liftM f m
 
   let txBlock(attr, level) = TxBlockBuilder(attr, level)
 

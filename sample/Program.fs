@@ -66,18 +66,24 @@ module Dao =
   let queryPersonByName (name: string) = txSupports {
     return! Db.query<Person.t> "select * from Person where Name = @name" ["@name" <-- name]}
 
+  let findPerson (id: int) = txSupports {
+    return! Db.find<Person.t> [id] }
+
   let updatePerson person = txSupports {
     return! Db.update<Person.t> person }
 
-let workflow = txRequired {
+/// query, increment Age values and then update
+let workflow1 = txRequired {
   do! Dao.setup
   let! persons = Dao.queryPersonAll()
-  for p in persons |> Seq.map Person.incrAge do
-    do! Dao.updatePerson p |!> ignore
+  return! persons |> List.map (Person.incrAge) |> mapM (Dao.updatePerson)}
+
+// query by name and query by identifier
+let workflow2 = txRequired {
+  do! Dao.setup
   let! p1 = Dao.queryPersonByName "hoge"
-  let! p2 = Dao.queryPersonByName "foo"
-  let! p3 = Dao.queryPersonByName "bar"
-  return [p1; p2; p3] }
+  let! p2 = Dao.findPerson 2
+  return p1 @ [p2] }
 
 let config = 
   let dataConvRepo =
@@ -98,5 +104,8 @@ let eval txBlock =
 
 [<EntryPoint>]
 let main argv = 
-  eval workflow
+  printfn "------------- workflow1 -------------"
+  eval workflow1
+  printfn "------------- workflow2 -------------"
+  eval workflow2
   System.Console.ReadKey() |> fun _ -> 0
