@@ -76,7 +76,7 @@ module Dao =
 let workflow1 = txRequired {
   do! Dao.setup
   let! persons = Dao.queryPersonAll()
-  return! persons |> List.map (Person.incrAge) |> mapM (Dao.updatePerson)}
+  return! persons |> List.map (Person.incrAge) |> Tx.mapM (Dao.updatePerson)}
 
 // query by name and query by identifier
 let workflow2 = txRequired {
@@ -98,7 +98,7 @@ let config =
     Logger = fun stmt -> printfn "LOG: %s" stmt.FormattedText }
 
 let eval txBlock =
-  match evalTxBlock config txBlock with
+  match Tx.eval config txBlock with
   | Success ret -> printfn "success: %A\n" ret
   | Failure exn -> printfn "failure: %A\n" exn
 

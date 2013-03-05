@@ -347,10 +347,15 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
 
 exception Abort of string
 
-[<AutoOpen>]
-module Operations =
+[<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Tx =
 
-  let inline (<--) (name:string) (value:'T) = Param(name, box value, typeof<'T>)
+  let abort e = TxBlock(fun _ state -> Failure e, state)
+
+  let abortwith message = abort <| Abort message
+
+  let rollbackOnly() = TxBlock(fun _ _ -> Success (), { IsRollbackOnly = true })
 
   let inline returnM m = TxBlock.returnM m
 
@@ -359,13 +364,11 @@ module Operations =
       TxBlock.bindM m <| fun m' ->
         returnM (f' m') 
 
-  let inline (<*>) f m = applyM f m
-
   let inline liftM f m =
     let ret x = returnM (f x)
     TxBlock.bindM m ret
 
-  let inline liftM2 f x y = returnM f <*> x <*> y
+  let inline liftM2 f x y = applyM (applyM (returnM f) x) y
 
   let inline private cons hd tl = hd :: tl
     
@@ -375,27 +378,9 @@ module Operations =
 
   let inline mapM f x = sequence (List.map f x)
 
-  let inline (<!>) f m = liftM f m
+  let inline ignore m = liftM ignore m
 
-  let inline (|!>) m f = liftM f m
-
-  let txBlock(attr, level) = TxBlockBuilder(attr, level)
-
-  let txRequired = TxBlockBuilder(TxAttr.Required, TxIsolationLevel.ReadCommitted)
-
-  let txRequiresNew = TxBlockBuilder(TxAttr.RequiresNew, TxIsolationLevel.ReadCommitted)
-
-  let txSupports = TxBlockBuilder(TxAttr.Supports, TxIsolationLevel.ReadCommitted)
-
-  let txNotSupported = TxBlockBuilder(TxAttr.NotSupported, TxIsolationLevel.ReadCommitted)
-
-  let abort e = TxBlock(fun _ state -> Failure e, state)
-
-  let abortwith message = abort <| Abort message
-
-  let rollbackOnly() = TxBlock(fun _ _ -> Success (), { IsRollbackOnly = true })
-
-  let runTxBlock (config: Config) (TxBlock(txBlock)) =
+  let run (config: Config) (TxBlock(txBlock)) =
     let state = { IsRollbackOnly = false }
     try
       use con = config.ConnectionProvider()
@@ -407,8 +392,27 @@ module Operations =
     with e -> 
       Failure e, state
 
-  let evalTxBlock config txBlock = 
-    runTxBlock config txBlock |> fst
+  let eval config txBlock = 
+    run config txBlock |> fst
 
-  let execTxBlock config txBlock = 
-    runTxBlock config txBlock |> snd
+  let exec config txBlock = 
+    run config txBlock |> snd
+
+[<AutoOpen>]
+module Operations =
+
+  let inline (<--) (name:string) (value:'T) = Param(name, box value, typeof<'T>)
+
+  let txBlock(attr, level) = TxBlockBuilder(attr, level)
+
+  let txRequired = TxBlockBuilder(TxAttr.Required, TxIsolationLevel.ReadCommitted)
+
+  let txRequiresNew = TxBlockBuilder(TxAttr.RequiresNew, TxIsolationLevel.ReadCommitted)
+
+  let txSupports = TxBlockBuilder(TxAttr.Supports, TxIsolationLevel.ReadCommitted)
+
+  let txNotSupported = TxBlockBuilder(TxAttr.NotSupported, TxIsolationLevel.ReadCommitted)
+
+  let inline (<*>) f m = Tx.applyM f m
+
+  let inline (<!>) f m = Tx.liftM f m
