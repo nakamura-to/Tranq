@@ -630,158 +630,107 @@ module internal Auto =
 module Db =
   
   let query<'T> sql parameters = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (sql, "sql") 
-      Guard.argNotNull (parameters, "parameters")
-      let ret = Script.query<'T> ctx sql parameters |> Seq.toList
-      Success ret, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (sql, "sql") 
+    Guard.argNotNull (parameters, "parameters")
+    let ret = Script.query<'T> ctx sql parameters |> Seq.toList
+    Success ret, state)
 
   let paginate<'T> sql parameters (offset, limit) = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (sql, "sql")
-      Guard.argNotNull (parameters, "parameters") 
-      let ret = Script.paginate<'T> ctx sql parameters (offset, limit) |> Seq.toList
-      Success ret, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (sql, "sql")
+    Guard.argNotNull (parameters, "parameters") 
+    let ret = Script.paginate<'T> ctx sql parameters (offset, limit) |> Seq.toList
+    Success ret, state)
 
   let paginateAndCount<'T> sql parameters (offset, limit) = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (sql, "sql")
-      Guard.argNotNull (parameters, "parameters")
-      let ret = Script.paginateAndCount<'T> ctx sql parameters (offset, limit) 
-      Success ret, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (sql, "sql")
+    Guard.argNotNull (parameters, "parameters")
+    let ret = Script.paginateAndCount<'T> ctx sql parameters (offset, limit) 
+    Success ret, state)
 
   let execute sql parameters = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (sql, "sql")
-      Guard.argNotNull (parameters, "parameters")
-      let ret = Script.execute ctx sql parameters 
-      Success ret, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (sql, "sql")
+    Guard.argNotNull (parameters, "parameters")
+    let ret = Script.execute ctx sql parameters 
+    Success ret, state)
 
   let run sql parameters = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (sql, "sql")
-      Guard.argNotNull (parameters, "parameters")
-      Script.execute ctx sql parameters |> ignore
-      Success (), state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (sql, "sql")
+    Guard.argNotNull (parameters, "parameters")
+    Script.execute ctx sql parameters |> ignore
+    Success (), state)
 
   let executeReader<'T> sql parameters handler = TxBlock(fun ctx state ->
-    try
-      Guard.argNotNull (sql, "sql")
-      Guard.argNotNull (parameters, "parameters")
-      Guard.argNotNull (handler, "handler")
-      let ret = Script.executeReader<'T> ctx sql parameters handler |> Seq.toList
-      Success ret, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (sql, "sql")
+    Guard.argNotNull (parameters, "parameters")
+    Guard.argNotNull (handler, "handler")
+    let ret = Script.executeReader<'T> ctx sql parameters handler |> Seq.toList
+    Success ret, state)
 
   let find<'T when 'T : not struct> id = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (id, "id")
-      match Auto.tryFind<'T> ctx id with
-      | Auto.Found value -> Success value, state
-      | Auto.NotFound stmt -> Failure (DbHelper.makeEntityNotFoundError stmt), state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (id, "id")
+    match Auto.tryFind<'T> ctx id with
+    | Auto.Found value -> Success value, state
+    | Auto.NotFound stmt -> Failure (DbHelper.makeEntityNotFoundError stmt), state)
 
   let tryFind<'T when 'T : not struct> id = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (id, "id")
-      match Auto.tryFind<'T> ctx id with
-      | Auto.Found value -> 
-        Success (Some value), state
-      | Auto.NotFound _ -> 
-        Success None, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (id, "id")
+    match Auto.tryFind<'T> ctx id with
+    | Auto.Found value -> 
+      Success (Some value), state
+    | Auto.NotFound _ -> 
+      Success None, state)
 
   let findWithVersion<'T when 'T : not struct> id version = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (id, "id")
-      match Auto.tryFindWithVersion<'T> ctx id version with
-      | Auto.Found value -> 
-        Success value, state
-      | Auto.NotFound stmt -> 
-        Failure (DbHelper.makeEntityNotFoundError stmt), state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (id, "id")
+    match Auto.tryFindWithVersion<'T> ctx id version with
+    | Auto.Found value -> 
+      Success value, state
+    | Auto.NotFound stmt -> 
+      Failure (DbHelper.makeEntityNotFoundError stmt), state)
 
   let tryFindWithVersion<'T when 'T : not struct> id version = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (id, "id")
-      match Auto.tryFindWithVersion<'T> ctx id version with
-      | Auto.Found value -> 
-        Success (Some value), state
-      | Auto.NotFound _ -> 
-        Success None, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (id, "id")
+    match Auto.tryFindWithVersion<'T> ctx id version with
+    | Auto.Found value -> 
+      Success (Some value), state
+    | Auto.NotFound _ -> 
+      Success None, state)
 
   let insert<'T when 'T : not struct> (entity: 'T) = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (entity, "entity")
-      let ret = Auto.insert ctx entity (InsertOpt())
-      Success ret, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (entity, "entity")
+    let ret = Auto.insert ctx entity (InsertOpt())
+    Success ret, state)
 
   let insertWithOpt<'T when 'T : not struct> (entity: 'T) opt = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (entity, "entity")
-      Guard.argNotNull (opt, "opt") 
-      let ret = Auto.insert ctx entity opt
-      Success ret, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (entity, "entity")
+    Guard.argNotNull (opt, "opt") 
+    let ret = Auto.insert ctx entity opt
+    Success ret, state)
 
   let update<'T when 'T : not struct> (entity: 'T) = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (entity, "entity")
-      let ret = Auto.update ctx entity (UpdateOpt())
-      Success ret, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (entity, "entity")
+    let ret = Auto.update ctx entity (UpdateOpt())
+    Success ret, state)
 
   let updateWithOpt<'T when 'T : not struct> (entity: 'T) opt = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (entity, "entity")
-      Guard.argNotNull (opt, "opt") 
-      let ret = Auto.update ctx entity opt
-      Success ret, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (entity, "entity")
+    Guard.argNotNull (opt, "opt") 
+    let ret = Auto.update ctx entity opt
+    Success ret, state)
 
   let delete<'T when 'T : not struct> (entity: 'T) = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (entity, "entity")
-      let ret = Auto.delete ctx entity (DeleteOpt())
-      Success ret, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (entity, "entity")
+    let ret = Auto.delete ctx entity (DeleteOpt())
+    Success ret, state)
 
   let deleteWithOpt<'T when 'T : not struct> (entity: 'T) opt = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (entity, "entity")
-      Guard.argNotNull (opt, "opt") 
-      let ret = Auto.delete ctx entity opt
-      Success ret, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (entity, "entity")
+    Guard.argNotNull (opt, "opt") 
+    let ret = Auto.delete ctx entity opt
+    Success ret, state)
 
   let call<'T when 'T : not struct> (procedure: 'T) = TxBlock(fun ctx state -> 
-    try
-      Guard.argNotNull (procedure, "procedure")
-      let ret = Auto.call ctx procedure
-      Success ret, state
-    with e ->
-      Failure e, state)
+    Guard.argNotNull (procedure, "procedure")
+    let ret = Auto.call ctx procedure
+    Success ret, state)
 

@@ -293,11 +293,11 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
   member this.Delay(f) = this.Bind(this.Return(), f)
   member this.Zero() = this.Return()
   member this.Combine(r1, r2) = this.Bind(r1, fun () -> r2)
-  member this.TryWith(m, h) = TxBlock(fun ctx ->
-    try TxBlock.run m ctx
-    with e -> TxBlock.run (h e) ctx)
-  member this.TryFinally(m, compensation) = TxBlock(fun ctx ->
-    try TxBlock.run m ctx
+  member this.TryWith(m, h) = TxBlock(fun ctx state ->
+    try TxBlock.run m ctx state
+    with e -> TxBlock.run (h e) ctx state)
+  member this.TryFinally(m, compensation) = TxBlock(fun ctx state ->
+    try TxBlock.run m ctx state
     finally compensation())
   member this.Using(res:#IDisposable, body) =
     this.TryFinally(body res, (fun () -> 
