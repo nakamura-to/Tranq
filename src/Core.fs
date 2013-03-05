@@ -256,7 +256,7 @@ type TxResult<'R> = Success of 'R | Failure of exn
 
 type TxState = { IsRollbackOnly: bool }
 
-type TxBlock<'R> = TxBlock of (TxContext -> TxState -> TxResult<'R> * TxState)
+type Tx<'R> = Tx of (TxContext -> TxState -> TxResult<'R> * TxState)
  
 type TxAttr = Required | RequiresNew | Supports | NotSupported
 
@@ -264,19 +264,19 @@ type TxIsolationLevel = ReadUncommitted | ReadCommitted | RepeatableRead | Seria
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module TxBlock =
+module internal TxHelper =
 
-  let inline run (TxBlock block) ctx state = 
+  let inline run (Tx block) ctx state = 
     block ctx state
 
-  let inline returnM x = TxBlock(fun ctx state -> Success x, state)
+  let inline returnM x = Tx(fun ctx state -> Success x, state)
   
-  let inline bindM m f = TxBlock(fun ctx state -> 
+  let inline bindM m f = Tx(fun ctx state -> 
     match run m ctx state with
     | Success out, state -> run (f out) ctx state
     | Failure exn, state -> Failure exn, state)
 
-type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
+type TxBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
   let toAdoTx = function
     | ReadUncommitted -> System.Data.IsolationLevel.ReadUncommitted
     | ReadCommitted -> System.Data.IsolationLevel.ReadCommitted
@@ -287,17 +287,17 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
     if con.State <> ConnectionState.Open then
       con.Open()
     con
-  member this.Return(x) = TxBlock.returnM x
+  member this.Return(x) = TxHelper.returnM x
   member this.ReturnFrom(m) = m
-  member this.Bind(m, f) = TxBlock.bindM m f
+  member this.Bind(m, f) = TxHelper.bindM m f
   member this.Delay(f) = this.Bind(this.Return(), f)
   member this.Zero() = this.Return()
   member this.Combine(r1, r2) = this.Bind(r1, fun () -> r2)
-  member this.TryWith(m, h) = TxBlock(fun ctx state ->
-    try TxBlock.run m ctx state
-    with e -> TxBlock.run (h e) ctx state)
-  member this.TryFinally(m, compensation) = TxBlock(fun ctx state ->
-    try TxBlock.run m ctx state
+  member this.TryWith(m, h) = Tx(fun ctx state ->
+    try TxHelper.run m ctx state
+    with e -> TxHelper.run (h e) ctx state)
+  member this.TryFinally(m, compensation) = Tx(fun ctx state ->
+    try TxHelper.run m ctx state
     finally compensation())
   member this.Using(res:#IDisposable, body) =
     this.TryFinally(body res, (fun () -> 
@@ -309,8 +309,8 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
   member this.For(sequence:seq<_>, body) =
     this.Using(sequence.GetEnumerator(),
       (fun enum -> this.While(enum.MoveNext, this.Delay(fun () -> body enum.Current))))
-  member this.Run(f) = TxBlock(fun ({Config = {ConnectionProvider = provider}; Connection = con; Transaction = tx} as ctx) state ->
-    let run ctx state = TxBlock.run f ctx state
+  member this.Run(f) = Tx(fun ({Config = {ConnectionProvider = provider}; Connection = con; Transaction = tx} as ctx) state ->
+    let run ctx state = TxHelper.run f ctx state
     let completeTx (tx: DbTransaction) result (state: TxState) =
       match result with
       | Success value -> 
@@ -351,22 +351,22 @@ exception Abort of string
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Tx =
 
-  let abort e = TxBlock(fun _ state -> Failure e, state)
+  let abort e = Tx(fun _ state -> Failure e, state)
 
   let abortwith message = abort <| Abort message
 
-  let rollbackOnly() = TxBlock(fun _ _ -> Success (), { IsRollbackOnly = true })
+  let rollbackOnly() = Tx(fun _ _ -> Success (), { IsRollbackOnly = true })
 
-  let inline returnM m = TxBlock.returnM m
+  let inline returnM m = TxHelper.returnM m
 
   let inline applyM f m =
-    TxBlock.bindM f <| fun f' ->
-      TxBlock.bindM m <| fun m' ->
+    TxHelper.bindM f <| fun f' ->
+      TxHelper.bindM m <| fun m' ->
         returnM (f' m') 
 
   let inline liftM f m =
     let ret x = returnM (f x)
-    TxBlock.bindM m ret
+    TxHelper.bindM m ret
 
   let inline liftM2 f x y = applyM (applyM (returnM f) x) y
 
@@ -380,7 +380,7 @@ module Tx =
 
   let inline ignore m = liftM ignore m
 
-  let run (config: Config) (TxBlock(txBlock)) =
+  let run (config: Config) (Tx(f)) =
     let state = { IsRollbackOnly = false }
     try
       use con = config.ConnectionProvider()
@@ -388,30 +388,33 @@ module Tx =
         Config = config
         Connection = con
         Transaction = None }
-      txBlock ctx state
+      f ctx state
     with e -> 
       Failure e, state
 
-  let eval config txBlock = 
-    run config txBlock |> fst
+  let eval config f = 
+    run config f |> fst
 
-  let exec config txBlock = 
-    run config txBlock |> snd
+  let exec config f = 
+    run config f |> snd
 
 [<AutoOpen>]
-module Operations =
+module Directives =
+
+  let tx(attr, level) = TxBuilder(attr, level)
+
+  let txRequired = TxBuilder(TxAttr.Required, TxIsolationLevel.ReadCommitted)
+
+  let txRequiresNew = TxBuilder(TxAttr.RequiresNew, TxIsolationLevel.ReadCommitted)
+
+  let txSupports = TxBuilder(TxAttr.Supports, TxIsolationLevel.ReadCommitted)
+
+  let txNotSupported = TxBuilder(TxAttr.NotSupported, TxIsolationLevel.ReadCommitted)
+
+[<AutoOpen>]
+module Operators =
 
   let inline (<--) (name:string) (value:'T) = Param(name, box value, typeof<'T>)
-
-  let txBlock(attr, level) = TxBlockBuilder(attr, level)
-
-  let txRequired = TxBlockBuilder(TxAttr.Required, TxIsolationLevel.ReadCommitted)
-
-  let txRequiresNew = TxBlockBuilder(TxAttr.RequiresNew, TxIsolationLevel.ReadCommitted)
-
-  let txSupports = TxBlockBuilder(TxAttr.Supports, TxIsolationLevel.ReadCommitted)
-
-  let txNotSupported = TxBlockBuilder(TxAttr.NotSupported, TxIsolationLevel.ReadCommitted)
 
   let inline (<*>) f m = Tx.applyM f m
 
