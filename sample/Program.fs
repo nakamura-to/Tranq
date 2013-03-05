@@ -3,11 +3,11 @@ open System.Data.SqlClient
 open Tranq
 
 module Email =
-  type t = Email of string
-  let create = Email
+  type t = Email of string | InvalidEmail of string
+  let create (v: string) = if v.Contains("@") then Email v else InvalidEmail v
   let conv = { new IDataConv<t, string> with
     member this.Compose(value) = create value
-    member this.Decompose(Email(value)) = value }
+    member this.Decompose(email) = match email with Email v | InvalidEmail v -> v }
 
 module Age =
   type t = Age of int option
@@ -48,7 +48,7 @@ module Dao =
       Db.insert<Person.t> {
         Id = 2
         Name = "foo"
-        Email = Email.create "foo@example.com"
+        Email = Email.create "foo_example.com"
         Age = Age.create None
         Version = Version.create -1 } 
     let! _ = 

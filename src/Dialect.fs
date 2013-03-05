@@ -247,23 +247,17 @@ type DialectBase(dataConvRepo) as this =
   abstract ConvertFromClrToDb : obj * Type * string -> obj * Type * DbType
   default this.ConvertFromClrToDb (clrValue, srcType, udtTypeName) = 
     let convert clrValue srcType =
-      if clrValue = null || Convert.IsDBNull(clrValue) then 
-        let typ =
-          if Type.isOption srcType then
-            Option.getElementType srcType
-          else
-            srcType
+      let value, typ =
+        if Type.isOption srcType then
+          Option.getElement srcType clrValue
+        else
+          clrValue, srcType
+      if value = null || Convert.IsDBNull(value) then 
         if typ.IsEnum then
           Convert.DBNull, typ.GetEnumUnderlyingType()
         else 
           Convert.DBNull, typ
       else
-        let value, typ =
-          let typ = clrValue.GetType()
-          if Type.isOption typ then
-            Option.getElement typ clrValue
-          else
-            clrValue, typ
         if typ.IsEnum then
           let text = Enum.Format(typ, value, "D")
           match typ.GetEnumUnderlyingType() with
@@ -283,7 +277,7 @@ type DialectBase(dataConvRepo) as this =
       match dataConvRepo.TryGet(typ) with
       | Some(basicType, _, decompose) -> 
         if value = Convert.DBNull then 
-          convert Convert.DBNull basicType
+          convert null basicType
         else
           let basic = decompose value
           convert basic basicType
