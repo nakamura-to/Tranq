@@ -32,33 +32,13 @@ module Person =
 
 module Dao =
   let setup = txSupports { 
-    do! 
-      Db.run "
+    do! Db.run "
         if exists (select * from dbo.sysobjects where id = object_id(N'Person')) drop table Person;
         create table Person (Id int primary key, Name varchar(20), Email varchar(50), Age int, Version int);
         " []
-    let! _ = 
-      Db.insert<Person.t> {
-        Id = 1
-        Name = "hoge"
-        Email = Email.create "hoge@example.com"
-        Age = Age.create <| Some 10
-        Version = Version.create -1 } 
-    let! _ = 
-      Db.insert<Person.t> {
-        Id = 2
-        Name = "foo"
-        Email = Email.create "foo_example.com"
-        Age = Age.create None
-        Version = Version.create -1 } 
-    let! _ = 
-      Db.insert<Person.t> {
-        Id = 3
-        Name = "bar"
-        Email = Email.create "bar@example.com"
-        Age = Age.create <| Some 20
-        Version = Version.create -1 } 
-    return ()}
+    do! Db.insert<Person.t> { Id = 1; Name = "hoge"; Email = Email.create "hoge@example.com"; Age = Age.create <| Some 10; Version = Version.create -1 } |> Tx.ignore
+    do! Db.insert<Person.t> { Id = 2; Name = "foo"; Email = Email.create "foo_example.com"; Age = Age.create None; Version = Version.create -1 } |> Tx.ignore
+    do! Db.insert<Person.t> { Id = 3; Name = "bar"; Email = Email.create "bar@example.com"; Age = Age.create <| Some 20; Version = Version.create -1 } |> Tx.ignore }
 
   let queryPersonAll () = txSupports {
     return! Db.query<Person.t> "select * from Person" [] }
@@ -76,7 +56,7 @@ module Dao =
 let workflow1 = txRequired {
   do! Dao.setup
   let! persons = Dao.queryPersonAll()
-  return! persons |> List.map (Person.incrAge) |> Tx.mapM (Dao.updatePerson)}
+  return! persons |> List.map Person.incrAge |> Tx.mapM Dao.updatePerson }
 
 // query by name and query by identifier
 let workflow2 = txRequired {
@@ -92,9 +72,9 @@ let config =
     repo.Add(Age.conv)
     repo.Add(Version.conv)
     repo
+  let connectionString = "Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;" 
   { Dialect = MsSqlDialect(dataConvRepo)
-    ConnectionProvider = fun () -> 
-      new SqlConnection("Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;") :> DbConnection
+    ConnectionProvider = fun () -> new SqlConnection(connectionString) :> DbConnection
     Logger = fun stmt -> printfn "LOG: %s" stmt.FormattedText }
 
 let eval txBlock =
