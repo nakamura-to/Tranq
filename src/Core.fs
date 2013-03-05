@@ -262,6 +262,24 @@ type TxAttr = Required | RequiresNew | Supports | NotSupported
 
 type TxIsolationLevel = ReadUncommitted | ReadCommitted | RepeatableRead | Serializable | Snapshot
 
+[<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module TxBlock =
+
+  let run (TxBlock block) ctx state = 
+    block ctx state
+
+  let returnM x = TxBlock(fun ctx state -> Success x, state)
+  
+  let bind f m = TxBlock(fun ctx state -> 
+    match run m ctx state with
+    | Success out, state -> run (f out) ctx state
+    | Failure exn, state -> Failure exn, state)
+
+  let lift f m =
+    let ret x = returnM (f x)
+    bind ret m
+
 type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
   let toAdoTx = function
     | ReadUncommitted -> System.Data.IsolationLevel.ReadUncommitted
@@ -269,26 +287,21 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
     | RepeatableRead -> System.Data.IsolationLevel.RepeatableRead
     | Serializable -> System.Data.IsolationLevel.Serializable
     | Snapshot -> System.Data.IsolationLevel.Snapshot
-  let runTxBlock (TxBlock block) ctx state = 
-    block ctx state
   let confirmOpen (con: DbConnection) =
     if con.State <> ConnectionState.Open then
       con.Open()
     con
-  member this.Return(result) = TxBlock(fun ctx state -> Success result, state)
+  member this.Return(x) = TxBlock.returnM x
   member this.ReturnFrom(m) = m
-  member this.Bind(m, f) = TxBlock(fun ctx state -> 
-    match runTxBlock m ctx state with
-    | Success out, state -> runTxBlock (f out) ctx state
-    | Failure exn, state -> Failure exn, state)
+  member this.Bind(m, f) = TxBlock.bind f m
   member this.Delay(f) = this.Bind(this.Return(), f)
   member this.Zero() = this.Return()
   member this.Combine(r1, r2) = this.Bind(r1, fun () -> r2)
   member this.TryWith(m, h) = TxBlock(fun ctx ->
-    try runTxBlock m ctx
-    with e -> runTxBlock (h e) ctx)
+    try TxBlock.run m ctx
+    with e -> TxBlock.run (h e) ctx)
   member this.TryFinally(m, compensation) = TxBlock(fun ctx ->
-    try runTxBlock m ctx
+    try TxBlock.run m ctx
     finally compensation())
   member this.Using(res:#IDisposable, body) =
     this.TryFinally(body res, (fun () -> 
@@ -302,7 +315,7 @@ type TxBlockBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
     this.Using(sequence.GetEnumerator(),
       (fun enum -> this.While(enum.MoveNext, this.Delay(fun () ->body enum.Current))))
   member this.Run(f) = TxBlock(fun ({Config = {ConnectionProvider = provider}; Connection = con; Transaction = tx} as ctx) state ->
-    let run ctx state = runTxBlock f ctx state
+    let run ctx state = TxBlock.run f ctx state
     let completeTx (tx: DbTransaction) result (state: TxState) =
       match result with
       | Success value -> 
@@ -343,6 +356,10 @@ exception Abort of string
 module Operations =
 
   let inline (<--) (name:string) (value:'T) = Param(name, box value, typeof<'T>)
+
+  let inline (<!>) f m = TxBlock.lift f m
+
+  let inline (|!>) m f = TxBlock.lift f m
 
   let txBlock(attr, level) = TxBlockBuilder(attr, level)
 

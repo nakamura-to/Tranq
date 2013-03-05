@@ -67,14 +67,13 @@ module Dao =
     return! Db.query<Person.t> "select * from Person where Name = @name" ["@name" <-- name]}
 
   let updatePerson person = txSupports {
-    let! _ = Db.update<Person.t> person
-    return ()}
+    return! Db.update<Person.t> person }
 
 let workflow = txRequired {
   do! Dao.setup
   let! persons = Dao.queryPersonAll()
   for p in persons |> Seq.map Person.incrAge do
-    do! Dao.updatePerson p
+    do! Dao.updatePerson p |!> ignore
   let! p1 = Dao.queryPersonByName "hoge"
   let! p2 = Dao.queryPersonByName "foo"
   let! p3 = Dao.queryPersonByName "bar"
