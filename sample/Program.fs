@@ -4,25 +4,25 @@ open Tranq
 
 module Email =
   type t = Email of string | InvalidEmail of string
-  let create (v: string) = if v.Contains("@") then Email v else InvalidEmail v
+  let make (v: string) = if v.Contains("@") then Email v else InvalidEmail v
   let conv = { new IDataConv<t, string> with
-    member this.Compose(value) = create value
+    member this.Compose(value) = make value
     member this.Decompose(email) = match email with Email v | InvalidEmail v -> v }
 
 module Age =
   type t = Age of int option
-  let create = Age
+  let make = Age
   let conv = { new IDataConv<t, int option> with
-    member this.Compose(value) = create value
+    member this.Compose(value) = make value
     member this.Decompose(Age(value)) = value }
   let incr (Age(age)) =
-    age |> Option.map ((+) 1) |> create
+    age |> Option.map ((+) 1) |> make
 
 module Version =
   type t = Version of int
-  let create = Version
+  let make = Version
   let conv = { new IDataConv<t, int> with
-    member this.Compose(value) = create value
+    member this.Compose(value) = make value
     member this.Decompose(Version(value)) = value }
 
 module Person =
@@ -30,39 +30,41 @@ module Person =
   type t = { [<Id>]Id: int; Name: string; Email: Email.t; Age: Age.t; [<Version>]Version: Version.t }
   let incrAge person = { person with Age = Age.incr person.Age }
 
-module Dao =
+module PersonDao =
+  type t = Person.t
+
   let setup = txSupports { 
     do! Db.run "
         if exists (select * from dbo.sysobjects where id = object_id(N'Person')) drop table Person;
         create table Person (Id int primary key, Name varchar(20), Email varchar(50), Age int, Version int);
         " []
-    do! Db.insert<Person.t> { Id = 1; Name = "hoge"; Email = Email.create "hoge@example.com"; Age = Age.create <| Some 10; Version = Version.create -1 } |> Tx.ignore
-    do! Db.insert<Person.t> { Id = 2; Name = "foo"; Email = Email.create "foo_example.com"; Age = Age.create None; Version = Version.create -1 } |> Tx.ignore
-    do! Db.insert<Person.t> { Id = 3; Name = "bar"; Email = Email.create "bar@example.com"; Age = Age.create <| Some 20; Version = Version.create -1 } |> Tx.ignore }
+    do! Db.insert<t> { Id = 1; Name = "hoge"; Email = Email.make "hoge@example.com"; Age = Age.make <| Some 10; Version = Version.make -1 } |> Tx.ignore
+    do! Db.insert<t> { Id = 2; Name = "foo"; Email = Email.make "foo_example.com"; Age = Age.make None; Version = Version.make -1 } |> Tx.ignore
+    do! Db.insert<t> { Id = 3; Name = "bar"; Email = Email.make "bar@example.com"; Age = Age.make <| Some 20; Version = Version.make -1 } |> Tx.ignore }
 
-  let queryPersonAll () = txSupports {
-    return! Db.query<Person.t> "select * from Person" [] }
+  let queryAll () = txSupports {
+    return! Db.query<t> "select * from Person" [] }
 
-  let queryPersonByName (name: string) = txSupports {
-    return! Db.query<Person.t> "select * from Person where Name = @name" ["@name" <-- name]}
+  let queryByName (name: string) = txSupports {
+    return! Db.query<t> "select * from Person where Name = @name" ["@name" <-- name] }
 
-  let findPerson (id: int) = txSupports {
-    return! Db.find<Person.t> [id] }
+  let find (id: int) = txSupports {
+    return! Db.find<t> [id] }
 
-  let updatePerson person = txSupports {
-    return! Db.update<Person.t> person }
+  let update person = txSupports {
+    return! Db.update<t> person }
 
 /// query, increment Age values and then update
 let workflow1 = txRequired {
-  do! Dao.setup
-  let! persons = Dao.queryPersonAll()
-  return! persons |> List.map Person.incrAge |> Tx.mapM Dao.updatePerson }
+  do! PersonDao.setup
+  let! persons = PersonDao.queryAll()
+  return! persons |> List.map Person.incrAge |> Tx.mapM PersonDao.update }
 
 // query by name and query by identifier
 let workflow2 = txRequired {
-  do! Dao.setup
-  let! p1 = Dao.queryPersonByName "hoge"
-  let! p2 = Dao.findPerson 2
+  do! PersonDao.setup
+  let! p1 = PersonDao.queryByName "hoge"
+  let! p2 = PersonDao.find 2
   return p1 @ [p2] }
 
 let config = 
