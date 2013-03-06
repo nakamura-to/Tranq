@@ -784,18 +784,48 @@ module SqlTest =
     assert_equal "%x$%x" ps.Params.[0].Value
 
   [<Test>]
-  let ``prepare : dialect root env : isNullOrEmpty`` () =
-    let ps = Sql.prepare dialect "select * from aaa where /*% if not (isNullOrEmpty bbb) */ bbb = /* bbb */'a'/*% end*/" [Param("bbb", "", typeof<string>)]
+  let ``prepare : dialect root env : isSome obj`` () =
+    let ps = Sql.prepare dialect "select * from aaa where /*% if isSome bbb */ bbb = /* bbb */'a'/*% end*/" [Param("bbb", "", typeof<string>)]
+    assert_equal "select * from aaa where  bbb = @p0" ps.Text
+
+  [<Test>]
+  let ``prepare : dialect root env : isSome Some`` () =
+    let ps = Sql.prepare dialect "select * from aaa where /*% if isSome bbb */ bbb = /* bbb */'a'/*% end*/" [Param("bbb", Some "", typeof<string option>)]
+    assert_equal "select * from aaa where  bbb = @p0" ps.Text
+
+  [<Test>]
+  let ``prepare : dialect root env : isSome None`` () =
+    let ps = Sql.prepare dialect "select * from aaa where /*% if isSome bbb */ bbb = /* bbb */'a'/*% end*/" [Param("bbb", (None: string option), typeof<string option>)]
     assert_equal "select * from aaa" ps.Text
 
   [<Test>]
-  let ``prepare : dialect root env : isNullOrEmpty : null`` () =
-    let ps = Sql.prepare dialect "select * from aaa where /*% if not (isNullOrEmpty bbb) */ bbb = /* bbb */'a'/*% end*/" [Param("bbb", null, typeof<obj>)]
+  let ``prepare : dialect root env : isNone obj`` () =
+    let ps = Sql.prepare dialect "select * from aaa where /*% if not (isNone bbb) */ bbb = /* bbb */'a'/*% end*/" [Param("bbb", "", typeof<string>)]
+    assert_equal "select * from aaa where  bbb = @p0" ps.Text
+
+  [<Test>]
+  let ``prepare : dialect root env : isNone Some`` () =
+    let ps = Sql.prepare dialect "select * from aaa where /*% if not (isNone bbb) */ bbb = /* bbb */'a'/*% end*/" [Param("bbb", Some "", typeof<string option>)]
+    assert_equal "select * from aaa where  bbb = @p0" ps.Text
+
+  [<Test>]
+  let ``prepare : dialect root env : isNone None`` () =
+    let ps = Sql.prepare dialect "select * from aaa where /*% if not (isNone bbb) */ bbb = /* bbb */'a'/*% end*/" [Param("bbb", (None: string option), typeof<string option>)]
     assert_equal "select * from aaa" ps.Text
 
   [<Test>]
-  let ``prepare : dialect root env : isNullOrEmpty : option`` () =
-    let ps = Sql.prepare dialect "select * from aaa where /*% if not (isNullOrEmpty bbb) */ bbb = /* bbb */'a'/*% end*/" [Param("bbb", Some "", typeof<string option>)]
+  let ``prepare : dialect root env : isNoneOrEmpty`` () =
+    let ps = Sql.prepare dialect "select * from aaa where /*% if not (isNoneOrEmpty bbb) */ bbb = /* bbb */'a'/*% end*/" [Param("bbb", "", typeof<string>)]
+    assert_equal "select * from aaa" ps.Text
+
+  [<Test>]
+  let ``prepare : dialect root env : isNoneOrEmpty : option Some`` () =
+    let ps = Sql.prepare dialect "select * from aaa where /*% if not (isNoneOrEmpty bbb) */ bbb = /* bbb */'a'/*% end*/" [Param("bbb", Some "", typeof<string option>)]
+    assert_equal "select * from aaa" ps.Text
+
+  [<Test>]
+  let ``prepare : dialect root env : isNoneOrEmpty : option None`` () =
+    let ps = Sql.prepare dialect "select * from aaa where /*% if not (isNoneOrEmpty bbb) */ bbb = /* bbb */'a'/*% end*/" [Param("bbb", (None: string option), typeof<string option>)]
     assert_equal "select * from aaa" ps.Text
 
   [<Test>]

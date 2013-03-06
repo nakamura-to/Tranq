@@ -18,9 +18,15 @@ open Tranq.SqlAst
 open Tranq.Text
 open Tranq.SqlParser
 
-module BuiltinFun =
+[<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module internal BuiltinFun =
 
-  let isNullOrEmpty (obj:obj) = 
+  let isSome (obj:obj) = obj <> null
+
+  let isNone (obj:obj) = obj = null
+
+  let isNoneOrEmpty (obj:obj) = 
     match obj with
     | :? string as x -> 
       String.IsNullOrEmpty(x)
@@ -29,7 +35,7 @@ module BuiltinFun =
     | _ -> 
       if obj = null then true else String.IsNullOrEmpty(string obj)
 
-  let isNullOrWhiteSpace (obj:obj) = 
+  let isNoneOrWhiteSpace (obj:obj) = 
     match obj with
     | :? string as x -> 
       String.IsNullOrWhiteSpace(x)
@@ -41,35 +47,26 @@ module BuiltinFun =
   let date (obj:obj) = 
     match obj with
     | :? DateTime as x -> 
-      Nullable x.Date
+      Some x.Date
     | :? option<DateTime> as x-> 
-      match x with 
-      | Some x -> Nullable x.Date 
-      | None -> Nullable()
-    | :? Nullable<DateTime> as x-> 
-      x
+      match x with
+      | Some dateTime ->
+        Some dateTime.Date
+      | __ -> None
     | _ -> 
       if obj <> null then 
         let d = Convert.ToDateTime(obj)
-        Nullable d.Date
+        Some d.Date
       else
-        Nullable()
+        None
 
   let nextDate (obj:obj) =
-    let nullable = date obj
-    if nullable.HasValue then
-      let value = nullable.Value
-      Nullable(value.Date.Add(TimeSpan(1, 0, 0, 0)))
-    else
-      nullable
+    date obj 
+    |> Option.map(fun v -> v.Date.Add(TimeSpan(1, 0, 0, 0)))
 
   let prevDate (obj:obj) =
-    let nullable = date obj
-    if nullable.HasValue then
-      let value = nullable.Value
-      Nullable(value.Date.Subtract(TimeSpan(1, 0, 0, 0)))
-    else
-      nullable
+    date obj 
+    |> Option.map(fun v -> v.Date.Subtract(TimeSpan(1, 0, 0, 0)))
 
   let escape (dilaect: IDialect) (obj:obj) = 
     match obj with
@@ -97,25 +94,18 @@ module BuiltinFun =
     let prefix = prefix dialect
     let infix = infix dialect
     let suffix = suffix dialect
-    let isNullOrEmptyType = isNullOrEmpty.GetType()
-    let isNullOrWhiteSpaceType = isNullOrWhiteSpace.GetType()
-    let dateType = date.GetType()
-    let nextDateType = nextDate.GetType()
-    let prevDateType = prevDate.GetType()
-    let escapeType = escape.GetType()
-    let prefixType = prefix.GetType()
-    let infixType = infix.GetType()
-    let suffixType = suffix.GetType()
     dict [
-      "isNullOrEmpty", (box isNullOrEmpty, isNullOrEmptyType)
-      "isNullOrWhiteSpace", (box isNullOrWhiteSpace, isNullOrWhiteSpaceType)
-      "date", (box date, dateType)
-      "nextDate", (box nextDate, nextDateType)
-      "prevDate", (box prevDate, prevDateType)
-      "escape", (box escape, escapeType)
-      "prefix", (box prefix, prefixType)
-      "infix", (box infix, infixType)
-      "suffix", (box suffix, suffixType) ]
+      "isSome", (box isSome, isSome.GetType())
+      "isNone", (box isNone, isNone.GetType())
+      "isNoneOrEmpty", (box isNoneOrEmpty, isNoneOrEmpty.GetType())
+      "isNoneOrWhiteSpace", (box isNoneOrWhiteSpace, isNoneOrWhiteSpace.GetType())
+      "date", (box date, date.GetType())
+      "nextDate", (box nextDate, nextDate.GetType())
+      "prevDate", (box prevDate, prevDate.GetType())
+      "escape", (box escape, escape.GetType())
+      "prefix", (box prefix, prefix.GetType())
+      "infix", (box infix, infix.GetType())
+      "suffix", (box suffix, suffix.GetType()) ]
 
 [<AbstractClass>]
 type DialectBase(dataConvRepo) as this = 
