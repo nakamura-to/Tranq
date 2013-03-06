@@ -184,7 +184,7 @@ module internal DbHelper =
       else 
         None
     let conv v t =
-      match dialect.DataConvRepo.TryGet(t) with
+      match dialect.DataConvRegistry.TryGet(t) with
       | Some(basicType, compose, decompose) ->
         if Type.isOption basicType then
           let element, elementType = Option.getElement basicType (decompose v)
@@ -211,7 +211,7 @@ module internal DbHelper =
           Number.incr (decompose v)
       compose num
     let conv v t =
-      match dialect.DataConvRepo.TryGet(t) with
+      match dialect.DataConvRegistry.TryGet(t) with
       | Some(basicType, compose, decompose) ->
         if Type.isOption basicType then
           let element, elementType = Option.getElement basicType (decompose v)

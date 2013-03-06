@@ -108,7 +108,7 @@ module internal BuiltinFun =
       "suffix", (box suffix, suffix.GetType()) ]
 
 [<AbstractClass>]
-type DialectBase(dataConvRepo) as this = 
+type DialectBase(dataConvReg) as this = 
 
   let lazyRootEnv = lazy (BuiltinFun.createRootEnv this)
 
@@ -118,8 +118,8 @@ type DialectBase(dataConvRepo) as this =
 
   abstract Name : string
 
-  abstract DataConvRepo : DataConvRepo
-  default this.DataConvRepo = dataConvRepo
+  abstract DataConvRegistry : DataConvRegistry
+  default this.DataConvRegistry = dataConvReg
 
   abstract CanGetIdentityAtOnce : bool
   default this.CanGetIdentityAtOnce = false
@@ -178,7 +178,7 @@ type DialectBase(dataConvRepo) as this =
           null
         else
           compose dbValue
-    match dataConvRepo.TryGet(destType) with
+    match dataConvReg.TryGet(destType) with
     | Some(basicType, compose, _) ->
       let dbValue = if dbValue = null || Convert.IsDBNull(dbValue) then null else dbValue
       toRichObject basicType compose dbValue
@@ -186,7 +186,7 @@ type DialectBase(dataConvRepo) as this =
       if dbValue = null || Convert.IsDBNull(dbValue) then
         null
       else
-        match dataConvRepo.TryGet(destType) with
+        match dataConvReg.TryGet(destType) with
         | Some(basicType, compose, _) -> 
           toRichObject basicType compose dbValue
         | _ -> 
@@ -198,7 +198,7 @@ type DialectBase(dataConvRepo) as this =
               if elementType.IsEnum then 
                 toEnumObject elementType dbValue
               else 
-                match dataConvRepo.TryGet(elementType) with
+                match dataConvReg.TryGet(elementType) with
                 | Some(basicType, compose, _) -> 
                   toRichObject basicType compose dbValue
                 | _ -> 
@@ -264,7 +264,12 @@ type DialectBase(dataConvRepo) as this =
           value, typ
     let value, typ = convert clrValue srcType
     let value, typ = 
-      match dataConvRepo.TryGet(typ) with
+      if FSharpType.IsUnion typ then
+        value, (FSharpType.GetUnionCases typ).[0].DeclaringType
+      else 
+        value, typ
+    let value, typ = 
+      match dataConvReg.TryGet(typ) with
       | Some(basicType, _, decompose) -> 
         if value = Convert.DBNull then 
           convert null basicType
@@ -522,7 +527,7 @@ type DialectBase(dataConvRepo) as this =
     
   interface IDialect with
     member this.Name = this.Name
-    member this.DataConvRepo = this.DataConvRepo
+    member this.DataConvRegistry = this.DataConvRegistry
     member this.CanGetIdentityAtOnce = this.CanGetIdentityAtOnce
     member this.CanGetIdentityAndVersionAtOnce = this.CanGetIdentityAndVersionAtOnce
     member this.CanGetVersionAtOnce = this.CanGetVersionAtOnce
@@ -550,8 +555,8 @@ type DialectBase(dataConvRepo) as this =
     member this.MakeParamDisposer(command) = this.MakeParamDisposer(command)
     member this.ParseSql(text) = this.ParseSql(text)
 
-type MsSqlDialect(?dataConvRepo) = 
-  inherit DialectBase(defaultArg dataConvRepo (DataConvRepo()))
+type MsSqlDialect(?dataConvReg) = 
+  inherit DialectBase(defaultArg dataConvReg (DataConvRegistry()))
 
   let escapeRegex = Regex(@"[$_%\[]")
 
@@ -750,8 +755,8 @@ type MsSqlDialect(?dataConvRepo) =
       ()
 
 
-type OracleDialect(?dataConvRepo) = 
-  inherit DialectBase(defaultArg dataConvRepo (DataConvRepo()))
+type OracleDialect(?dataConvReg) = 
+  inherit DialectBase(defaultArg dataConvReg (DataConvRegistry()))
  
   let escapeRegex = Regex(@"[$_%＿％]")
 

@@ -4,7 +4,7 @@ open Tranq
 
 module Email =
   type t = Email of string | InvalidEmail of string
-  let make (v: string) = if v.Contains("@") then Email v else InvalidEmail v
+  let make v = if String.exists ((=) '@') v then Email v else InvalidEmail v
   let conv = { new IDataConv<t, string> with
     member this.Compose(value) = make value
     member this.Decompose(email) = match email with Email v | InvalidEmail v -> v }
@@ -45,8 +45,8 @@ module PersonDao =
   let queryAll () = txSupports {
     return! Db.query<t> "select * from Person" [] }
 
-  let queryByName (name: string) = txSupports {
-    return! Db.query<t> "select * from Person where Name = @name" ["@name" <-- name] }
+  let queryByEmail email = txSupports {
+    return! Db.query<t> "select * from Person where Name = @name" ["@name" <-- (email: Email.t)] }
 
   let find (id: int) = txSupports {
     return! Db.find<t> [id] }
@@ -54,7 +54,7 @@ module PersonDao =
   let update person = txSupports {
     return! Db.update<t> person }
 
-/// query, increment Age values and then update
+/// query, increment age and then update
 let workflow1 = txRequired {
   do! PersonDao.setup
   let! persons = PersonDao.queryAll()
@@ -63,24 +63,24 @@ let workflow1 = txRequired {
 // query by name and query by identifier
 let workflow2 = txRequired {
   do! PersonDao.setup
-  let! p1 = PersonDao.queryByName "hoge"
+  let! p1 = PersonDao.queryByEmail <| Email.make "hoge@example.com"
   let! p2 = PersonDao.find 2
   return p1 @ [p2] }
 
 let config = 
   let dataConvRepo =
-    let repo = DataConvRepo()
-    repo.Add(Email.conv)
-    repo.Add(Age.conv)
-    repo.Add(Version.conv)
-    repo
+    let reg = DataConvRegistry()
+    reg.Add(Email.conv)
+    reg.Add(Age.conv)
+    reg.Add(Version.conv)
+    reg
   let connectionString = "Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;" 
   { Dialect = MsSqlDialect(dataConvRepo)
     ConnectionProvider = fun () -> new SqlConnection(connectionString) :> DbConnection
     Logger = fun stmt -> printfn "LOG: %s" stmt.FormattedText }
 
-let eval txBlock =
-  match Tx.eval config txBlock with
+let eval tx =
+  match Tx.eval config tx with
   | Success ret -> printfn "success: %A\n" ret
   | Failure exn -> printfn "failure: %A\n" exn
 

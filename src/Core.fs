@@ -126,7 +126,7 @@ type IDataConv<'TRich, 'TBasic> =
   abstract Compose : 'TBasic -> 'TRich
   abstract Decompose : 'TRich -> 'TBasic 
 
-type DataConvRepo() =
+type DataConvRegistry() =
   let dict = new ConcurrentDictionary<string, Type * (obj -> obj) * (obj -> obj)>()
   let key (typ: Type) = typ.FullName
   member this.Add<'TRich, 'TBasic>(conv: IDataConv<'TRich, 'TBasic>) =
@@ -156,7 +156,7 @@ type DataConvRepo() =
 
 type IDialect =
   abstract Name: string
-  abstract DataConvRepo: DataConvRepo
+  abstract DataConvRegistry: DataConvRegistry
   abstract CanGetIdentityAtOnce: bool
   abstract CanGetIdentityAndVersionAtOnce: bool
   abstract CanGetVersionAtOnce: bool

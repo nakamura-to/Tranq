@@ -1204,11 +1204,11 @@ module SqlTest =
 
   [<Test>]
   let ``MsSqlDialect : ConvertFromDbToClr : conv`` () =
-    let repo = DataConvRepo()
-    repo.Add({new IDataConv<Num, int> with 
+    let reg = DataConvRegistry()
+    reg.Add({new IDataConv<Num, int> with 
       member this.Compose(v) = Num v
       member this.Decompose(Num(v)) = v})
-    let dialect = MsSqlDialect(repo)
+    let dialect = MsSqlDialect(reg)
     // raw type
     assert_equal (Num 1) (dialect.ConvertFromDbToClr(1, typeof<Num>, null, null))
     assert_equal null (dialect.ConvertFromDbToClr(Convert.DBNull, typeof<Num>, null, null))
@@ -1220,11 +1220,11 @@ module SqlTest =
 
   [<Test>]
   let ``MsSqlDialect : ConvertFromDbToClr : conv option`` () =
-    let repo = DataConvRepo()
-    repo.Add({new IDataConv<NumOpt, int option> with 
+    let reg = DataConvRegistry()
+    reg.Add({new IDataConv<NumOpt, int option> with 
       member this.Compose(v) = NumOpt v
       member this.Decompose(NumOpt(v)) = v})
-    let dialect = MsSqlDialect(repo)
+    let dialect = MsSqlDialect(reg)
     // raw type
     assert_equal (NumOpt(Some 1)) (dialect.ConvertFromDbToClr(1, typeof<NumOpt>, null, null))
     assert_equal (NumOpt None) (dialect.ConvertFromDbToClr(Convert.DBNull, typeof<NumOpt>, null, null))
@@ -1262,11 +1262,11 @@ module SqlTest =
 
   [<Test>]
   let ``MsSqlDialect : ConvertFromClrToDb : conv`` () =
-    let repo = DataConvRepo()
-    repo.Add({new IDataConv<Age, int> with 
+    let reg = DataConvRegistry()
+    reg.Add({new IDataConv<Age, int> with 
       member this.Compose(v) = Age v
       member this.Decompose(Age(v)) = v})
-    let dialect = MsSqlDialect(repo)
+    let dialect = MsSqlDialect(reg)
     // raw type
     assert_equal (box 1, typeof<int>, DbType.Int32) (dialect.ConvertFromClrToDb(Age 1, typeof<Age>, null))
     assert_equal (Convert.DBNull, typeof<int>, DbType.Int32) (dialect.ConvertFromClrToDb(null, typeof<Age>, null))
@@ -1278,11 +1278,11 @@ module SqlTest =
 
   [<Test>]
   let ``MsSqlDialect : ConvertFromClrToDb : conv opt`` () =
-    let repo = DataConvRepo()
-    repo.Add({new IDataConv<AgeOpt, int option> with 
+    let reg = DataConvRegistry()
+    reg.Add({new IDataConv<AgeOpt, int option> with 
       member this.Compose(v) = AgeOpt v
       member this.Decompose(AgeOpt(v)) = v})
-    let dialect = MsSqlDialect(repo)
+    let dialect = MsSqlDialect(reg)
     // raw type
     assert_equal (box 1, typeof<int>, DbType.Int32) (dialect.ConvertFromClrToDb(AgeOpt(Some 1), typeof<AgeOpt>, null))
     assert_equal (Convert.DBNull, typeof<int>, DbType.Int32) (dialect.ConvertFromClrToDb(null, typeof<AgeOpt>, null))

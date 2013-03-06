@@ -32,14 +32,14 @@ module DbHelperTest =
 
   [<Test>]
   let ``initVersionValue: rich type``() =
-    let repo = DataConvRepo()
-    repo.Add({ new IDataConv<Version, int> with
+    let reg = DataConvRegistry()
+    reg.Add({ new IDataConv<Version, int> with
       member this.Compose v = Version v
       member this.Decompose (Version(v)) = v})
-    repo.Add({ new IDataConv<VersionOpt, int option> with
+    reg.Add({ new IDataConv<VersionOpt, int option> with
       member this.Compose v = VersionOpt v
       member this.Decompose (VersionOpt(v)) = v})
-    let dialect = MsSqlDialect(repo)
+    let dialect = MsSqlDialect(reg)
     assert_equal (Some (box (Version 1))) (DbHelper.initVersionValue dialect (Version 0) typeof<Version>)
     assert_equal None (DbHelper.initVersionValue dialect (Version 10) typeof<Version>)
     assert_equal (Some (box (Some (Version 1)))) (DbHelper.initVersionValue dialect None typeof<Version option>)
@@ -57,14 +57,14 @@ module DbHelperTest =
 
   [<Test>]
   let ``incrVersionValue: rich type``() =
-    let repo = DataConvRepo()
-    repo.Add({ new IDataConv<Version, int> with
+    let reg = DataConvRegistry()
+    reg.Add({ new IDataConv<Version, int> with
       member this.Compose v = Version v
       member this.Decompose (Version(v)) = v})
-    repo.Add({ new IDataConv<VersionOpt, int option> with
+    reg.Add({ new IDataConv<VersionOpt, int option> with
       member this.Compose v = VersionOpt v
       member this.Decompose (VersionOpt(v)) = v})
-    let dialect = MsSqlDialect(repo)
+    let dialect = MsSqlDialect(reg)
     assert_equal (box (Version 1)) (DbHelper.incrVersionValue dialect (Version 0) typeof<Version>)
     assert_equal (box (Version 11)) (DbHelper.incrVersionValue dialect (Version 10) typeof<Version>)
     assert_equal (Some(Version 1)) (DbHelper.incrVersionValue dialect None typeof<Version option>)
