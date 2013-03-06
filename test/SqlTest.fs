@@ -1308,10 +1308,10 @@ module SqlTest =
     assert_equal "123" (dialect.FormatAsSqlLiteral(123L, typeof<int64>, DbType.Int64))
 
   [<Test>]
-  let ``MsSqlDialect : CreateParameterName`` () =
+  let ``MsSqlDialect : CreateParamName`` () =
     let dialect = MsSqlDialect()
-    assert_equal "@p0" (dialect.CreateParameterName(0))
-    assert_equal "@p1" (dialect.CreateParameterName(1))
+    assert_equal "@p0" (dialect.CreateParamName(0))
+    assert_equal "@p1" (dialect.CreateParamName(1))
 
   [<Test>]
   let ``MsSqlDialect : object expression`` () =
@@ -1459,9 +1459,9 @@ module SqlTest =
     assert_equal "ab$[c" (dialect.EscapeMetaChars "ab[c")
 
   [<Test>]
-  let ``OracleDialect : CreateParameterName`` () =
+  let ``OracleDialect : CreateParamName`` () =
     let dialect = OracleDialect()
-    let value = dialect.CreateParameterName("hoge")
+    let value = dialect.CreateParamName("hoge")
     assert_equal "hoge" value
 
   [<Test>]

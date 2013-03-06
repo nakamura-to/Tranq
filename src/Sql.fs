@@ -107,13 +107,13 @@ module RewriteHelper =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Sql =
 
-  type internal State (dialect, env: IDictionary<string, (obj * Type)>, parameterIndex) =
-    let buf = SqlBuilder(dialect, ParameterIndex = parameterIndex)
+  type internal State (dialect, env: IDictionary<string, (obj * Type)>, paramIndex) =
+    let buf = SqlBuilder(dialect, ParamIndex = paramIndex)
     member this.Dialect = dialect
     member this.Sql = buf.Sql
     member this.FormattedSql = buf.FormattedSql
-    member this.Parameters = buf.Parameters
-    member this.ParameterIndex = buf.ParameterIndex
+    member this.Params = buf.Params
+    member this.ParamIndex = buf.ParamIndex
     member val Env = env with get, set
     member val IsAvailable = false with get, set
     member val IsInsideBlock = false with get, set
@@ -121,8 +121,8 @@ module Sql =
     member this.AppendState (other : State) =
       buf.Sql.Append(other.Sql) |> ignore
       buf.FormattedSql.Append(other.FormattedSql) |> ignore
-      other.Parameters |> Seq.iter (fun p -> buf.Parameters.Add(p))
-      buf.ParameterIndex <- other.ParameterIndex
+      other.Params |> Seq.iter (fun p -> buf.Params.Add(p))
+      buf.ParamIndex <- other.ParamIndex
     member this.AppendFragment (fragment : string) =
       buf.Append(fragment)
     member this.AppendFragment (fragment : string, hint : Node) =
@@ -290,7 +290,7 @@ module Sql =
         if state.IsInsideBlock then 
           invalidBlock keyword loc sql
         let childState = 
-          List.fold visitNode (State(state.Dialect, state.Env, state.ParameterIndex)) nodeList
+          List.fold visitNode (State(state.Dialect, state.Env, state.ParamIndex)) nodeList
         if childState.IsAvailable then 
           state.AppendFragment(keyword, node)
           state.AppendState(childState)
@@ -311,7 +311,7 @@ module Sql =
           state.AppendFragment s
           state.AppendFragment ")"
         | _ -> 
-          let childState = visitStatement (State(state.Dialect, state.Env, state.ParameterIndex)) statement
+          let childState = visitStatement (State(state.Dialect, state.Env, state.ParamIndex)) statement
           if childState.IsAvailable || childState.StartsWithClause then 
             state.IsAvailable <- true
             state.AppendFragment "("
@@ -637,7 +637,7 @@ module Sql =
           match paramMeta.ParamMetaCase with
           | Input | InputOutput -> value
           | _ -> box DBNull.Value
-        let name = dialect.CreateParameterName paramMeta.ParamName
+        let name = dialect.CreateParamName paramMeta.ParamName
         { Name = name
           Value = value
           Type = typ

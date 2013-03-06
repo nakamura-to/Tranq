@@ -171,17 +171,17 @@ type IDialect =
   abstract ConvertFromDbToClr: dbValue:obj * destType:Type * udtTypeName:string * destProp:PropertyInfo-> obj
   abstract ConvertFromClrToDb: clrValue:obj * srcType:Type * udtTypeName:string -> obj * Type * DbType
   abstract FormatAsSqlLiteral: dbValue:obj * clrType:Type * dbType:DbType -> string
-  abstract CreateParameterName: index:int -> string
-  abstract CreateParameterName: baseName:string -> string
+  abstract CreateParamName: index:int -> string
+  abstract CreateParamName: baseName:string -> string
   abstract IsUniqueConstraintViolation: exn:exn -> bool
   abstract RewriteForPagination: statement:SqlAst.Statement * sql:string * condition:IDictionary<string, obj * Type> * offset:int64 * limit:int64 -> string * IDictionary<string, obj * Type>
   abstract RewriteForCalcPagination: statement:SqlAst.Statement * sql:string * condition:IDictionary<string, obj * Type> * offset:int64 * limit:int64 -> string * IDictionary<string, obj * Type>
   abstract RewriteForCount: statement:SqlAst.Statement * sql:string * condition:IDictionary<string, obj * Type> -> string * IDictionary<string, obj * Type>
   abstract BuildProcedureCallSql: procedureName:string * parameters:PreparedParam seq -> string
   abstract EncloseIdentifier: identifier:string -> string
-  abstract SetupDbParameter: param:PreparedParam * dbParam:DbParameter -> unit
+  abstract SetupDbParam: param:PreparedParam * dbParam:DbParameter -> unit
   abstract GetValue: reader:DbDataReader * index:int * destProp:PropertyInfo -> obj
-  abstract MakeParametersDisposer: command:DbCommand -> IDisposable
+  abstract MakeParamDisposer: command:DbCommand -> IDisposable
   abstract ParseSql: text:string -> SqlAst.Statement
 
 type InsertOpt() =
@@ -200,18 +200,18 @@ type DeleteOpt() =
 
 type Param = Param of string * obj * Type
 
-type SqlBuilder(dialect:IDialect, ?capacity, ?parameterNameSuffix) =
+type SqlBuilder(dialect:IDialect, ?capacity, ?paramNameSuffix) =
   let sql = StringBuilder(defaultArg capacity 200)
   let formattedSql = StringBuilder(defaultArg capacity 200)
   let parameters = ResizeArray<PreparedParam>()
-  let parameterNameSuffix = defaultArg parameterNameSuffix String.Empty
-  let mutable parameterIndex = 0
+  let paramNameSuffix = defaultArg paramNameSuffix String.Empty
+  let mutable paramIndex = 0
   member this.Sql = sql
   member this.FormattedSql = formattedSql
-  member this.Parameters = parameters
-  member this.ParameterIndex
-    with get () = parameterIndex
-    and  set (v) = parameterIndex <- v
+  member this.Params = parameters
+  member this.ParamIndex
+    with get () = paramIndex
+    and  set (v) = paramIndex <- v
   member this.Append (fragment : string) =
     sql.Append fragment |> ignore
     formattedSql.Append fragment |> ignore
@@ -223,12 +223,12 @@ type SqlBuilder(dialect:IDialect, ?capacity, ?parameterNameSuffix) =
     formattedSql.Remove(formattedSql.Length - size, size) |> ignore
   member this.Bind (value : obj, typ : Type) =
     let value, typ, dbType = dialect.ConvertFromClrToDb(value, typ, null)
-    let parameterName = dialect.CreateParameterName(parameterIndex) + parameterNameSuffix
-    parameterIndex <- parameterIndex + 1
-    sql.Append(parameterName) |> ignore
+    let paramName = dialect.CreateParamName(paramIndex) + paramNameSuffix
+    paramIndex <- paramIndex + 1
+    sql.Append(paramName) |> ignore
     formattedSql.Append (dialect.FormatAsSqlLiteral(value, typ, dbType)) |> ignore
     parameters.Add(
-      { Name = parameterName
+      { Name = paramName
         Value = value
         Type = typ
         DbType = dbType

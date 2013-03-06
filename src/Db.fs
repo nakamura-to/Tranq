@@ -243,9 +243,9 @@ module internal Exec =
     stmt.Params
     |> List.iter (fun param ->
       let dbParam = command.CreateParameter()
-      dialect.SetupDbParameter(param, dbParam)
+      dialect.SetupDbParam(param, dbParam)
       command.Parameters.Add dbParam |> ignore )
-    dialect.MakeParametersDisposer command
+    dialect.MakeParamDisposer command
 
   let handleCommand (dialect: IDialect) (stmt:PreparedStatement) command commandHandler =
     try
@@ -612,7 +612,7 @@ module internal Auto =
         | Result _ -> false
         | _ -> true )
       |> Seq.iter (fun paramMeta -> 
-        let paramName = dialect.CreateParameterName paramMeta.ParamName
+        let paramName = dialect.CreateParamName paramMeta.ParamName
         let valueCase =
           if command.Parameters.Contains(paramName) then
             let value = command.Parameters.[paramName].Value

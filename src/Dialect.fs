@@ -326,12 +326,12 @@ type DialectBase(dataConvRepo) as this =
       | _ -> 
         string dbValue
   
-  abstract CreateParameterName : int -> string
-  default this.CreateParameterName (index:int) =
+  abstract CreateParamName : int -> string
+  default this.CreateParamName (index:int) =
     "@p" + string index
   
-  abstract CreateParameterName : string -> string
-  default this.CreateParameterName (baseName:string) =
+  abstract CreateParamName : string -> string
+  default this.CreateParamName (baseName:string) =
     if baseName.StartsWith "@" then
       baseName
     else
@@ -489,8 +489,8 @@ type DialectBase(dataConvRepo) as this =
  
   abstract EncloseIdentifier : string -> string
  
-  abstract SetupDbParameter : PreparedParam * DbParameter -> unit
-  default this.SetupDbParameter(param, dbParam) =
+  abstract SetupDbParam : PreparedParam * DbParameter -> unit
+  default this.SetupDbParam(param, dbParam) =
     let dbParam = dbParam :> IDbDataParameter
     dbParam.ParameterName <- param.Name
     dbParam.DbType <- param.DbType
@@ -511,8 +511,8 @@ type DialectBase(dataConvRepo) as this =
   default this.GetValue(reader, index, destProp) =
     reader.GetValue(index)
 
-  abstract MakeParametersDisposer : DbCommand -> IDisposable
-  default this.MakeParametersDisposer(command) = 
+  abstract MakeParamDisposer : DbCommand -> IDisposable
+  default this.MakeParamDisposer(command) = 
     emptyDisposer
 
   abstract ParseSql : string -> SqlAst.Statement
@@ -537,17 +537,17 @@ type DialectBase(dataConvRepo) as this =
     member this.ConvertFromDbToClr(value, typ, string, destProp) = this.ConvertFromDbToClr(value, typ, string, destProp)
     member this.ConvertFromClrToDb(value, typ, string) = this.ConvertFromClrToDb(value, typ, string)
     member this.FormatAsSqlLiteral(value, clrType, dbType) = this.FormatAsSqlLiteral(value, clrType, dbType)
-    member this.CreateParameterName(index:int) = this.CreateParameterName(index)
-    member this.CreateParameterName(baseName:string) = this.CreateParameterName(baseName)
+    member this.CreateParamName(index:int) = this.CreateParamName(index)
+    member this.CreateParamName(baseName:string) = this.CreateParamName(baseName)
     member this.IsUniqueConstraintViolation(exn) = this.IsUniqueConstraintViolation (exn)
     member this.RewriteForPagination(statement, sql, exprCtxt, offset, limit) = this.RewriteForPagination(statement, sql, exprCtxt, offset, limit)
     member this.RewriteForCalcPagination(statement, sql, exprCtxt, offset, limit) = this.RewriteForCalcPagination(statement, sql, exprCtxt, offset, limit)
     member this.RewriteForCount(statement, sql, exprCtxt) =  this.RewriteForCount(statement, sql, exprCtxt)
     member this.BuildProcedureCallSql(procedureName, parameters) = this.BuildProcedureCallSql(procedureName, parameters)
     member this.EncloseIdentifier(identifier) = this.EncloseIdentifier(identifier)
-    member this.SetupDbParameter(param, dbParam) = this.SetupDbParameter(param, dbParam)
+    member this.SetupDbParam(param, dbParam) = this.SetupDbParam(param, dbParam)
     member this.GetValue(reader, index, destProp) = this.GetValue(reader, index, destProp)
-    member this.MakeParametersDisposer(command) = this.MakeParametersDisposer(command)
+    member this.MakeParamDisposer(command) = this.MakeParamDisposer(command)
     member this.ParseSql(text) = this.ParseSql(text)
 
 type MsSqlDialect(?dataConvRepo) = 
@@ -585,7 +585,7 @@ type MsSqlDialect(?dataConvRepo) =
     buf.Build()
 
   override this.PrepareVersionSelect(tableName, versionColumnName, idMetaList) = 
-    let buf = SqlBuilder(dialect = this, parameterNameSuffix = "x")
+    let buf = SqlBuilder(dialect = this, paramNameSuffix = "x")
     buf.Append "select "
     buf.Append versionColumnName
     buf.Append " from "
@@ -733,8 +733,8 @@ type MsSqlDialect(?dataConvRepo) =
   override this.EncloseIdentifier(identifier) = "[" + identifier + "]"
 
   // http://msdn.microsoft.com/ja-jp/library/yy6y35y8.aspx
-  override this.SetupDbParameter(param, dbParam) =
-    base.SetupDbParameter(param, dbParam)
+  override this.SetupDbParam(param, dbParam) =
+    base.SetupDbParam(param, dbParam)
     match dbParam with
     | :? System.Data.SqlClient.SqlParameter as dbParam -> 
       match param.DbType with
@@ -779,10 +779,10 @@ type OracleDialect(?dataConvRepo) =
       | _ -> false
     | _ -> false
  
-  override this.CreateParameterName (index:int) =
+  override this.CreateParamName (index:int) =
     ":p" + string index
  
-  override this.CreateParameterName (baseName:string) =
+  override this.CreateParamName (baseName:string) =
     baseName
  
   override this.BuildProcedureCallSql(procedureName, parameters) =
@@ -891,8 +891,8 @@ type OracleDialect(?dataConvRepo) =
       | Some value -> value
       | _ -> base.FormatAsSqlLiteral (dbValue, clrType, dbType)
 
-  override this.SetupDbParameter(param, dbParam) =
-    base.SetupDbParameter(param, dbParam)
+  override this.SetupDbParam(param, dbParam) =
+    base.SetupDbParam(param, dbParam)
     let dbParamType = dbParam.GetType()
     let assembly = dbParamType.Assembly
     let setOracleDbType typeName =
@@ -912,7 +912,7 @@ type OracleDialect(?dataConvRepo) =
       if prop <> null then
         prop.SetValue(dbParam, param.UdtTypeName, null)
   
-  override this.MakeParametersDisposer(command) = 
+  override this.MakeParamDisposer(command) = 
     { new IDisposable with 
       member this.Dispose() =
         let dispose : obj -> unit = function
