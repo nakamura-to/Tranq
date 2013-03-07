@@ -242,25 +242,30 @@ type SqlBuilder(dialect:IDialect, ?capacity, ?paramNameSuffix) =
       FormattedText = formattedSql.ToString().Trim()
       Params = List.ofSeq parameters }
 
-type Config = {
-  Dialect: IDialect
-  ConnectionProvider: unit -> DbConnection
-  Logger: PreparedStatement -> unit }
-
-type TxContext = { 
-  Config: Config
-  Connection: DbConnection
-  Transaction: DbTransaction option }
-
 type TxResult<'R> = Success of 'R | Failure of exn
 
 type TxState = { IsRollbackOnly: bool }
 
 type Tx<'R> = Tx of (TxContext -> TxState -> TxResult<'R> * TxState)
  
-type TxAttr = Required | RequiresNew | Supports | NotSupported
+and TxAttr = Required | RequiresNew | Supports | NotSupported
 
-type TxIsolationLevel = ReadUncommitted | ReadCommitted | RepeatableRead | Serializable | Snapshot
+and TxIsolationLevel = ReadUncommitted | ReadCommitted | RepeatableRead | Serializable | Snapshot
+
+and Event = 
+  | TxBegin of int * TxAttr * TxIsolationLevel
+  | TxEnd of int * TxAttr * TxIsolationLevel * bool
+  | Sql of int option * PreparedStatement
+
+and Config = {
+  Dialect: IDialect
+  ConnectionProvider: unit -> DbConnection
+  Listener: Event -> unit }
+
+and TxContext = { 
+  Config: Config
+  Connection: DbConnection
+  Transaction: DbTransaction option }
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -276,7 +281,7 @@ module internal TxHelper =
     | Success out, state -> run (f out) ctx state
     | Failure exn, state -> Failure exn, state)
 
-type TxBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
+type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
   let toAdoTx = function
     | ReadUncommitted -> System.Data.IsolationLevel.ReadUncommitted
     | ReadCommitted -> System.Data.IsolationLevel.ReadCommitted
@@ -309,21 +314,30 @@ type TxBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
   member this.For(sequence:seq<_>, body) =
     this.Using(sequence.GetEnumerator(),
       (fun enum -> this.While(enum.MoveNext, this.Delay(fun () -> body enum.Current))))
-  member this.Run(f) = Tx(fun ({Config = {ConnectionProvider = provider}; Connection = con; Transaction = tx} as ctx) state ->
+  member this.Run(f) = Tx(fun ({Config = config; Connection = con; Transaction = tx} as ctx) state ->
+    let listener = config.Listener
     let run ctx state = TxHelper.run f ctx state
-    let completeTx (tx: DbTransaction) result (state: TxState) =
+    let begin_ (tx: DbTransaction) =
+      config.Listener (TxBegin (tx.GetHashCode(), txAttr, txIsolatioinLevel))
+    let commit (tx: DbTransaction) =
+      tx.Commit()
+      config.Listener (TxEnd (tx.GetHashCode(), txAttr, txIsolatioinLevel, true))
+    let rollback (tx: DbTransaction) = 
+      tx.Rollback()
+      config.Listener (TxEnd (tx.GetHashCode(), txAttr, txIsolatioinLevel, false))
+    let completeTx tx result (state: TxState) =
       match result with
       | Success value -> 
         try
           if state.IsRollbackOnly then
-            tx.Rollback()
+            rollback tx
           else
-            tx.Commit()
+            commit tx
           Success value, state
         with e ->
           Failure e, state
       | Failure exn ->
-        try tx.Rollback() with e -> ()
+        try rollback tx with e -> ()
         Failure exn, state 
     match txAttr, tx with
     | Required, Some _ -> 
@@ -331,18 +345,20 @@ type TxBuilder(txAttr: TxAttr, level: TxIsolationLevel) =
     | Required, None
     | RequiresNew, None ->
       let con = confirmOpen con
-      use tx = con.BeginTransaction(toAdoTx level)
+      use tx = con.BeginTransaction(toAdoTx txIsolatioinLevel)
+      begin_ tx
       let result, state = run {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
       completeTx tx result state
     | RequiresNew, Some _ ->
-      use con = confirmOpen (provider())
-      use tx = con.BeginTransaction(toAdoTx level)
+      use con = confirmOpen (config.ConnectionProvider())
+      use tx = con.BeginTransaction(toAdoTx txIsolatioinLevel)
+      begin_ tx
       let result, state = run {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
       completeTx tx result state
     | Supports, _ ->
       run ctx state
     | NotSupported, _ -> 
-      use con = confirmOpen (provider())
+      use con = confirmOpen (config.ConnectionProvider())
       run {ctx with Connection = con; Transaction = None } {IsRollbackOnly = false})
 
 exception Abort of string

@@ -75,9 +75,15 @@ let config =
     reg.Add(Version.conv)
     reg
   let connectionString = "Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;" 
+  let log = printfn "LOG: %s"
   { Dialect = MsSqlDialect(dataConvRepo)
     ConnectionProvider = fun () -> new SqlConnection(connectionString) :> DbConnection
-    Logger = fun stmt -> printfn "LOG: %s" stmt.FormattedText }
+    Listener = function
+      | TxBegin(txId, _, _)-> log (sprintf "txId=%d, tx begin" txId)
+      | TxEnd(txId, _, _, commit)-> 
+        let kind = if commit then "commit" else "rollback"
+        log (sprintf "txId=%d tx %s" txId kind)
+      | Sql(txId, stmt) -> log (sprintf "txId=%A, sql=[%s]" txId stmt.FormattedText) }
 
 let eval tx =
   match Tx.eval config tx with

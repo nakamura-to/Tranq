@@ -257,11 +257,12 @@ module internal Exec =
       else 
         reraise()
 
-  let execute ({Config = {Dialect = dialect; Logger = logger}; Connection = con} as ctx) stmt commandHandler = 
+  let execute ({Config = {Dialect = dialect; Listener = listener}; Connection = con; Transaction = tx} as ctx) stmt commandHandler = 
     seq {
       use command = con.CreateCommand()
       use paramsDisposer = setupCommand ctx stmt command
-      logger stmt
+      let txId = Option.map (fun tx -> tx.GetHashCode()) tx
+      listener (Sql (txId, stmt))
       yield! handleCommand dialect stmt command commandHandler }
 
   let executeCommand<'T> ctx stmt (commandHandler:DbCommand -> 'T) = 
@@ -276,7 +277,7 @@ module internal Exec =
       else
         yield! Seq.empty })
 
-  let executeReaderAndScalar<'T> ({Config = {Dialect = dialect; Logger = logger}} as ctx) readerStmt (readerHandler: DbDataReader -> 'T seq) scalarStmt = 
+  let executeReaderAndScalar<'T> ({Config = {Dialect = dialect; Listener = listener}; Transaction = tx} as ctx) readerStmt (readerHandler: DbDataReader -> 'T seq) scalarStmt = 
     executeCommand ctx readerStmt (fun command -> 
       let results =
         use reader = handleCommand dialect readerStmt command (fun command -> command.ExecuteReader())
@@ -286,7 +287,8 @@ module internal Exec =
           []
       use command = command.Connection.CreateCommand()
       use paramsDisposer = setupCommand ctx scalarStmt command
-      logger scalarStmt
+      let txId = Option.map (fun tx -> tx.GetHashCode()) tx
+      listener (Sql (txId, scalarStmt))
       let scalarResult = handleCommand dialect scalarStmt command (fun command -> command.ExecuteScalar())
       results, scalarResult )
 
