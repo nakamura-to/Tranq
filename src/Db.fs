@@ -258,7 +258,12 @@ module internal Exec =
         reraise()
 
   let execute ({Config = {Dialect = dialect; Listener = listener}; Connection = con; Transaction = tx} as ctx) stmt commandHandler = 
+    let confirmOpen (con: DbConnection) =
+      if con.State <> ConnectionState.Open then
+        con.Open()
+      con
     seq {
+      let con = confirmOpen con
       use command = con.CreateCommand()
       use paramsDisposer = setupCommand ctx stmt command
       let txId = Option.map (fun tx -> tx.GetHashCode()) tx
