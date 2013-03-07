@@ -420,23 +420,23 @@ type DialectBase(dataConvReg) as this =
     let buf = StringBuilder(400)
     buf.Append "select * from ( select temp_.*, row_number() over( " |> ignore
     buf.Append orderByBuf |> ignore
-    buf.Append " ) as soma_rownumber_ from ( " |> ignore
+    buf.Append " ) as tranq_rownumber_ from ( " |> ignore
     buf.Append subqueryBuf |> ignore
     buf.Append ") temp_ ) temp2_ where " |> ignore
-    buf.Append "soma_rownumber_ > " |> ignore
-    buf.Append "/* soma_offset */" |> ignore
+    buf.Append "tranq_rownumber_ > " |> ignore
+    buf.Append "/* tranq_offset */" |> ignore
     buf.Append offset |> ignore
     if limit >= 0L then
       buf.Append " and " |> ignore
-      buf.Append "soma_rownumber_ <= " |> ignore
-      buf.Append "/* soma_offset + soma_limit */" |> ignore
+      buf.Append "tranq_rownumber_ <= " |> ignore
+      buf.Append "/* tranq_offset + tranq_limit */" |> ignore
       buf.Append (offset + limit) |> ignore
     if forUpdateBuf.Length > 0 then
       buf.Append " " |> ignore
       buf.Append forUpdateBuf |> ignore
     let exprCtxt = Dictionary<string, obj * Type>(exprCtxt) :> IDictionary<string, obj * Type>
-    exprCtxt.["soma_offset"] <- (box offset, typeof<int>)
-    exprCtxt.["soma_limit"] <- (box limit, typeof<int>)
+    exprCtxt.["tranq_offset"] <- (box offset, typeof<int>)
+    exprCtxt.["tranq_limit"] <- (box limit, typeof<int>)
     buf.ToString(), exprCtxt
   
   abstract RewriteForCount : SqlAst.Statement * string * IDictionary<string, obj * Type> -> string * IDictionary<string, obj * Type>
@@ -649,7 +649,7 @@ type MsSqlDialect(?dataConvReg) =
         buf.Append keyword |> ignore
         if !level = 0 then
           buf.Append " top " |> ignore
-          buf.Append "(/* soma_limit */" |> ignore
+          buf.Append "(/* tranq_limit */" |> ignore
           buf.Append limit |> ignore
           buf.Append ")" |> ignore
         List.fold visitNode buf nodeList
@@ -676,7 +676,7 @@ type MsSqlDialect(?dataConvReg) =
         RewriteHelper.writeForBlock (forComment, nodeList) buf visitNode
     let buf = visitStatement (StringBuilder(200) )statement
     let exprCtxt = Dictionary<string, obj * Type>(exprCtxt) :> IDictionary<string, obj * Type>
-    exprCtxt.["soma_limit"] <- (box limit, typeof<int>)
+    exprCtxt.["tranq_limit"] <- (box limit, typeof<int>)
     buf.ToString(), exprCtxt
  
   override this.BuildProcedureCallSql(procedureName, parameters) = 

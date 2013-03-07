@@ -630,7 +630,7 @@ module SqlTest =
     printfn "%s" ps.Text
     let sql = "select * from ( select temp_.*, row_number() over( order by
           temp_.id
-         ) as soma_rownumber_ from ( 
+         ) as tranq_rownumber_ from ( 
         select * from aaa 
         where 
         bbb1 = @p0 
@@ -644,7 +644,7 @@ module SqlTest =
         bbb3 = @p2 
           
         
-        ) temp_ ) temp2_ where soma_rownumber_ > @p3 and soma_rownumber_ <= @p4"
+        ) temp_ ) temp2_ where tranq_rownumber_ > @p3 and tranq_rownumber_ <= @p4"
     assert_equal sql ps.Text
     assert_equal 5 ps.Params.Length
     assert_equal "1" ps.Params.[0].Value
@@ -1327,9 +1327,9 @@ module SqlTest =
     let statement = Sql.parse sql
     let sql, exprCtxt = dialect.RewriteForPagination(statement, sql, Map.empty, 0L, 10L)
     assert_equal 
-      "select top (/* soma_limit */10) * from aaa where bbb = /* bbb */'a' order by ccc"
+      "select top (/* tranq_limit */10) * from aaa where bbb = /* bbb */'a' order by ccc"
       sql
-    assert_true (exprCtxt.ContainsKey "soma_limit")
+    assert_true (exprCtxt.ContainsKey "tranq_limit")
 
   [<Test>]
   let ``MsSqlDialect : RewriteForPagination : offset is zero : if block`` () =
@@ -1338,9 +1338,9 @@ module SqlTest =
     let statement = Sql.parse sql
     let sql, exprCtxt = dialect.RewriteForPagination(statement, sql, Map.empty, 0L, 10L)
     assert_equal 
-      "select top (/* soma_limit */10) * from aaa where /*% if true */bbb = /* bbb */'a' /*% elif true */ bbb = 'b' /*% else */ bbb = 'c' /*% end */ order by ccc"
+      "select top (/* tranq_limit */10) * from aaa where /*% if true */bbb = /* bbb */'a' /*% elif true */ bbb = 'b' /*% else */ bbb = 'c' /*% end */ order by ccc"
       sql
-    assert_true (exprCtxt.ContainsKey "soma_limit")
+    assert_true (exprCtxt.ContainsKey "tranq_limit")
 
   [<Test>]
   let ``MsSqlDialect : RewriteForPagination : offset is zero : for block`` () =
@@ -1355,14 +1355,14 @@ module SqlTest =
     let statement = Sql.parse sql
     let sql, exprCtxt = dialect.RewriteForPagination(statement, sql, Map.empty, 0L, 10L)
     assert_equal
-      "select top (/* soma_limit */10) * from aaa where
+      "select top (/* tranq_limit */10) * from aaa where
       /*% for b in bbb */
       bbb = /* b */'b' 
       /*% if bbb_has_next */ /*# 'or' */ /*% end */
       /*% end */
       order by ccc"
       sql
-    assert_true (exprCtxt.ContainsKey "soma_limit")
+    assert_true (exprCtxt.ContainsKey "tranq_limit")
 
   [<Test>]
   let ``MsSqlDialect : RewriteForPagination : offset is not zero`` () =
@@ -1371,10 +1371,10 @@ module SqlTest =
     let statement = Sql.parse sql
     let sql, exprCtxt = dialect.RewriteForPagination(statement, sql, Map.empty, 5L, 10L)
     assert_equal 
-      "select * from ( select temp_.*, row_number() over( order by ccc ) as soma_rownumber_ from ( select * from aaa where bbb = /* bbb */'a' ) temp_ ) temp2_ where soma_rownumber_ > /* soma_offset */5 and soma_rownumber_ <= /* soma_offset + soma_limit */15"
+      "select * from ( select temp_.*, row_number() over( order by ccc ) as tranq_rownumber_ from ( select * from aaa where bbb = /* bbb */'a' ) temp_ ) temp2_ where tranq_rownumber_ > /* tranq_offset */5 and tranq_rownumber_ <= /* tranq_offset + tranq_limit */15"
       sql
-    assert_true (exprCtxt.ContainsKey "soma_offset")
-    assert_true (exprCtxt.ContainsKey "soma_limit")
+    assert_true (exprCtxt.ContainsKey "tranq_offset")
+    assert_true (exprCtxt.ContainsKey "tranq_limit")
 
   [<Test>]
   let ``MsSqlDialect : RewriteForPagination : offset is not zero : column qualified`` () =
@@ -1383,10 +1383,10 @@ module SqlTest =
     let statement = Sql.parse sql
     let sql, exprCtxt = dialect.RewriteForPagination(statement, sql, Map.empty, 5L, 10L)
     assert_equal 
-      "select * from ( select temp_.*, row_number() over( order by temp_.ccc ) as soma_rownumber_ from ( select * from xxx.aaa where xxx.aaa.bbb = /* bbb */'a' ) temp_ ) temp2_ where soma_rownumber_ > /* soma_offset */5 and soma_rownumber_ <= /* soma_offset + soma_limit */15"
+      "select * from ( select temp_.*, row_number() over( order by temp_.ccc ) as tranq_rownumber_ from ( select * from xxx.aaa where xxx.aaa.bbb = /* bbb */'a' ) temp_ ) temp2_ where tranq_rownumber_ > /* tranq_offset */5 and tranq_rownumber_ <= /* tranq_offset + tranq_limit */15"
       sql
-    assert_true (exprCtxt.ContainsKey "soma_offset")
-    assert_true (exprCtxt.ContainsKey "soma_limit")
+    assert_true (exprCtxt.ContainsKey "tranq_offset")
+    assert_true (exprCtxt.ContainsKey "tranq_limit")
 
   [<Test>]
   let ``MsSqlDialect : RewriteForPagination : offset is not zero : if block`` () =
@@ -1401,15 +1401,15 @@ module SqlTest =
     let statement = Sql.parse sql
     let sql, exprCtxt = dialect.RewriteForPagination(statement, sql, Map.empty, 5L, 10L)
     assert_equal
-      "select * from ( select temp_.*, row_number() over( order by ccc ) as soma_rownumber_ from ( select * from aaa where
+      "select * from ( select temp_.*, row_number() over( order by ccc ) as tranq_rownumber_ from ( select * from aaa where
       /*% for b in bbb */
       bbb = /* b */'b' 
       /*% if bbb_has_next */ /*# 'or' */ /*% end */
       /*% end */
-      ) temp_ ) temp2_ where soma_rownumber_ > /* soma_offset */5 and soma_rownumber_ <= /* soma_offset + soma_limit */15"
+      ) temp_ ) temp2_ where tranq_rownumber_ > /* tranq_offset */5 and tranq_rownumber_ <= /* tranq_offset + tranq_limit */15"
       sql
-    assert_true (exprCtxt.ContainsKey "soma_offset")
-    assert_true (exprCtxt.ContainsKey "soma_limit")
+    assert_true (exprCtxt.ContainsKey "tranq_offset")
+    assert_true (exprCtxt.ContainsKey "tranq_limit")
 
   [<Test>]
   let ``MsSqlDialect : RewriteForPagination : offset is not zero : for block`` () =
@@ -1418,10 +1418,10 @@ module SqlTest =
     let statement = Sql.parse sql
     let sql, exprCtxt = dialect.RewriteForPagination(statement, sql, Map.empty, 5L, 10L)
     assert_equal 
-      "select * from ( select temp_.*, row_number() over( order by ccc ) as soma_rownumber_ from ( select * from aaa where /*% if true */ bbb = /* bbb */'a' /*% end */ ) temp_ ) temp2_ where soma_rownumber_ > /* soma_offset */5 and soma_rownumber_ <= /* soma_offset + soma_limit */15"
+      "select * from ( select temp_.*, row_number() over( order by ccc ) as tranq_rownumber_ from ( select * from aaa where /*% if true */ bbb = /* bbb */'a' /*% end */ ) temp_ ) temp2_ where tranq_rownumber_ > /* tranq_offset */5 and tranq_rownumber_ <= /* tranq_offset + tranq_limit */15"
       sql
-    assert_true (exprCtxt.ContainsKey "soma_offset")
-    assert_true (exprCtxt.ContainsKey "soma_limit")
+    assert_true (exprCtxt.ContainsKey "tranq_offset")
+    assert_true (exprCtxt.ContainsKey "tranq_limit")
 
   [<Test>]
   let ``MsSqlDialect : RewriteForPagination : offset is not zero : no order by clause`` () =
