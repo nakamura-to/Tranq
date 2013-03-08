@@ -68,7 +68,7 @@ let workflow2 = txRequired {
   return p1 @ [p2] }
 
 let config = 
-  let dataConvRepo =
+  let dataConvReg =
     let reg = DataConvRegistry()
     reg.Add(Email.conv)
     reg.Add(Age.conv)
@@ -76,14 +76,16 @@ let config =
     reg
   let connectionString = "Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;" 
   let log = printfn "LOG: %s"
-  { Dialect = MsSqlDialect(dataConvRepo)
+  let listener = function
+    | TxBegin(txId, _, _)-> log (sprintf "txId=%d, tx begin" txId)
+    | TxCommit(txId, _, _)-> log (sprintf "txId=%d, tx commit" txId)
+    | TxRollback(txId, _, _)-> log (sprintf "txId=%d, tx rollback" txId)
+    | Sql(txId, stmt) -> 
+      let txId = match txId with Some v -> string v | _ -> ""
+      log (sprintf "txId=%s, sql=[%s]" txId stmt.FormattedText)
+  { Dialect = MsSqlDialect(dataConvReg)
     ConnectionProvider = fun () -> new SqlConnection(connectionString) :> DbConnection
-    Listener = function
-      | TxBegin(txId, _, _)-> log (sprintf "txId=%d, tx begin" txId)
-      | TxEnd(txId, _, _, commit)-> 
-        let kind = if commit then "commit" else "rollback"
-        log (sprintf "txId=%d tx %s" txId kind)
-      | Sql(txId, stmt) -> log (sprintf "txId=%A, sql=[%s]" txId stmt.FormattedText) }
+    Listener = listener }
 
 let eval tx =
   match Tx.eval config tx with

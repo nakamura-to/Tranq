@@ -254,7 +254,8 @@ and TxIsolationLevel = ReadUncommitted | ReadCommitted | RepeatableRead | Serial
 
 and Event = 
   | TxBegin of int * TxAttr * TxIsolationLevel
-  | TxEnd of int * TxAttr * TxIsolationLevel * bool
+  | TxCommit of int * TxAttr * TxIsolationLevel
+  | TxRollback of int * TxAttr * TxIsolationLevel
   | Sql of int option * PreparedStatement
 
 and Config = {
@@ -321,10 +322,10 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
       config.Listener (TxBegin (tx.GetHashCode(), txAttr, txIsolatioinLevel))
     let commit (tx: DbTransaction) =
       tx.Commit()
-      config.Listener (TxEnd (tx.GetHashCode(), txAttr, txIsolatioinLevel, true))
+      config.Listener (TxCommit (tx.GetHashCode(), txAttr, txIsolatioinLevel))
     let rollback (tx: DbTransaction) = 
       tx.Rollback()
-      config.Listener (TxEnd (tx.GetHashCode(), txAttr, txIsolatioinLevel, false))
+      config.Listener (TxRollback (tx.GetHashCode(), txAttr, txIsolatioinLevel))
     let completeTx tx result (state: TxState) =
       match result with
       | Success value -> 
