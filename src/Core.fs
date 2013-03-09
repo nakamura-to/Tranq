@@ -372,7 +372,7 @@ module Tx =
 
   let abortwith message = abort <| Abort message
 
-  let rollbackOnly() = Tx(fun _ _ -> Success (), { IsRollbackOnly = true })
+  let rollbackOnly = Tx(fun _ _ -> Success (), { IsRollbackOnly = true })
 
   let inline returnM m = TxHelper.returnM m
 

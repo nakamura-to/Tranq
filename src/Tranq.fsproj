@@ -12,6 +12,7 @@
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Tranq</Name>
     <TargetFrameworkProfile />
+    <RunPostBuildEvent>OnOutputUpdated</RunPostBuildEvent>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -95,12 +96,14 @@
     <PreBuildEvent>
       <!---->
       cd "$(ProjectDir)"
-      "$(ProjectDir)..\tools\FSharpPowerPack-4.0.0.0\bin\fsyacc.exe" "ExprParser.fsy" &#045;&#045;internal &#045;&#045;module "Tranq.ExprParser"
-      "$(ProjectDir)..\tools\FSharpPowerPack-4.0.0.0\bin\fslex.exe" "ExprLexer.fsl" &#045;&#045;unicode
-      "$(ProjectDir)..\tools\FSharpPowerPack-4.0.0.0\bin\fsyacc.exe" "SqlParser.fsy" &#045;&#045;internal &#045;&#045;module "Tranq.SqlParser"
-      "$(ProjectDir)..\tools\FSharpPowerPack-4.0.0.0\bin\fslex.exe" "SqlLexer.fsl" &#045;&#045;unicode
-      <!---->
-    </PreBuildEvent>
+      "$(ProjectDir)..\tools\FSharpPowerPack-4.0.0.0\bin\fsyacc.exe" "ExprParser.fsy" --internal --module "Tranq.ExprParser"
+      "$(ProjectDir)..\tools\FSharpPowerPack-4.0.0.0\bin\fslex.exe" "ExprLexer.fsl" --unicode
+      "$(ProjectDir)..\tools\FSharpPowerPack-4.0.0.0\bin\fsyacc.exe" "SqlParser.fsy" --internal --module "Tranq.SqlParser"
+      "$(ProjectDir)..\tools\FSharpPowerPack-4.0.0.0\bin\fslex.exe" "SqlLexer.fsl" --unicode
+      <!----></PreBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup>
+    <PostBuildEvent>copy /y $(TargetPath) /b $(ProjectDir)\..\test_mssql\lib /b</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
