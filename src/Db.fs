@@ -369,8 +369,9 @@ module internal Auto =
   type FindResult<'T> = Found of 'T | NotFound of PreparedStatement
 
   let private validateType<'T> =
-    if not <| Type.isRecord typeof<'T> then
-      raise <| DbException(SR.TRANQ4002())
+    let typ = typeof<'T>
+    if not <| Type.isRecord typ then
+      raise <| DbException(SR.TRANQ4002 typ.FullName)
 
   let private get<'T when 'T : not struct> ({Dialect = dialect}) idList  = 
     if List.isEmpty idList then

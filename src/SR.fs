@@ -125,7 +125,7 @@ module internal SR =
   let TRANQ3009 args = message2 ("TRANQ3009", args)
 
   (* db *)
-  let TRANQ4002 args = message0 ("TRANQ4002", args)
+  let TRANQ4002 args = message1 ("TRANQ4002", args)
   let TRANQ4003 args = message2 ("TRANQ4003", args)
   let TRANQ4004 args = message0 ("TRANQ4004", args)
   let TRANQ4005 args = message1 ("TRANQ4005", args)

@@ -55,6 +55,7 @@
     <Compile Include="Util.fs" />
     <Compile Include="FindTest.fs" />
     <Compile Include="InsertTest.fs" />
+    <Compile Include="DeleteTest.fs" />
     <None Include="create.sql" />
     <None Include="packages.config" />
   </ItemGroup>

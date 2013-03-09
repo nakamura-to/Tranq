@@ -1,6 +1,6 @@
 ﻿//----------------------------------------------------------------------------
 //
-// Copyright (c) 2011 The Soma Team. 
+// Copyright (c) 2013 The Tranq Team. 
 //
 // This source code is subject to terms and conditions of the Apache License, Version 2.0. A 
 // copy of the license can be found in the License.txt file at the root of this distribution. 

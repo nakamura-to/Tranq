@@ -289,7 +289,7 @@
     <value>SequeceAttribute is not found for the property({0}) of the type({1}).</value>
   </data>
   <data name="TRANQ4002" xml:space="preserve">
-    <value>The type parameter must be a record type.</value>
+    <value>The type parameter({0}) must be a record type.</value>
   </data>
   <data name="TRANQ4003" xml:space="preserve">
     <value>The length of the argument for the parameter "id" must be {0}, but is {1}.</value>

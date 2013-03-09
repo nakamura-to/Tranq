@@ -184,19 +184,19 @@ type IDialect =
   abstract MakeParamDisposer: command:DbCommand -> IDisposable
   abstract ParseSql: text:string -> SqlAst.Statement
 
-type InsertOpt() =
-  member val Exclude: string seq = Seq.empty with get, set
-  member val Include: string seq = Seq.empty with get,set
-  member val ExcludeNone = false with get, set
+type InsertOpt(?Exclude: string seq, ?Include: string seq, ?ExcludeNone: bool) =
+  member this.Exclude = defaultArg Exclude Seq.empty
+  member this.Include = defaultArg Include Seq.empty
+  member this.ExcludeNone = defaultArg ExcludeNone false
 
-type UpdateOpt() =
-  member val Exclude: string seq = Seq.empty with get, set
-  member val Include: string seq = Seq.empty with get,set
-  member val ExcludeNone = false with get, set
-  member val IgnoreVersion = false with get, set
+type UpdateOpt(?Exclude: string seq, ?Include: string seq, ?ExcludeNone: bool, ?IgnoreVersion: bool) =
+  member this.Exclude = defaultArg Exclude Seq.empty
+  member this.Include = defaultArg Include Seq.empty
+  member this.ExcludeNone = defaultArg ExcludeNone false
+  member this.IgnoreVersion = defaultArg IgnoreVersion false
 
-type DeleteOpt() =
-  member val IgnoreVersion = false with get, set
+type DeleteOpt(?IgnoreVersion: bool) =
+  member this.IgnoreVersion = defaultArg IgnoreVersion false
 
 type Param = Param of string * obj * Type
 
