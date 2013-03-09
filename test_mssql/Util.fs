@@ -56,6 +56,10 @@ module Assert =
     if expected <> actual then
       failwithf "expected:\n%A\nactual:\n%A" expected actual
 
+  let isNotEqualTo expected actual =
+    if expected = actual then
+      failwithf "expected:\n%A\nactual:\n%A" expected actual
+
   let isTrue actual =
     if actual <> true then
       failwithf "expected: true"
