@@ -13,7 +13,6 @@
 namespace Tranq.Test.MsSql
 
 open System
-open System.Configuration
 open NUnit.Framework
 open Tranq
 

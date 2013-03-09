@@ -297,10 +297,10 @@ module internal Exec =
       else
         yield! Seq.empty })
 
-  let executeReaderWitUserHandler ({Config = {Dialect = dialect}} as ctx) stmt readerHandler =
+  let executeReaderWitUserHandler<'T> ({Config = {Dialect = dialect}} as ctx) stmt (readerHandler: DbDataReader -> 'T) =
     execute ctx stmt (fun command ->
       use reader = command.ExecuteReader()
-      readerHandler reader |> Seq.toList)
+      readerHandler reader)
 
   let executeAndGetFirst<'T> ctx stmt (readerHandler: DbDataReader -> 'T seq) =
     executeReader<'T> ctx stmt (fun reader -> Seq.truncate 1 (readerHandler reader))
@@ -358,9 +358,9 @@ module internal Script =
     let stmt = Sql.prepare dialect sql parameters
     Exec.executeNonQuery ctx stmt
 
-  let executeReader<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters handler = 
+  let executeReader<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters readerHandler = 
     let stmt = Sql.prepare dialect sql parameters
-    Exec.executeReader<'T> ctx stmt handler
+    Exec.executeReaderWitUserHandler<'T> ctx stmt readerHandler
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -646,11 +646,11 @@ module Db =
     Script.execute ctx sql parameters |> ignore
     Success (), state)
 
-  let executeReader<'T> sql parameters handler = Tx(fun ctx state ->
+  let executeReader<'T> sql parameters readerHandler = Tx(fun ctx state ->
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
-    Guard.argNotNull (handler, "handler")
-    let ret = Script.executeReader<'T> ctx sql parameters handler
+    Guard.argNotNull (readerHandler, "readerHandler")
+    let ret = Script.executeReader<'T> ctx sql parameters readerHandler
     Success ret, state)
 
   let find<'T when 'T : not struct> id = Tx(fun ctx state -> 
