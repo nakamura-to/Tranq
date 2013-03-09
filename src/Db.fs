@@ -237,6 +237,11 @@ module internal DbHelper =
 
 module internal Exec =
 
+  let confirmOpen (con: DbConnection) =
+    if con.State <> ConnectionState.Open then
+      con.Open()
+    con
+
   let setupCommand {Config = {Dialect = dialect}; Transaction = tx} (stmt:PreparedStatement) (command:DbCommand) =
     Option.iter (fun tx -> command.Transaction <- tx) tx
     command.CommandText <- stmt.Text
@@ -247,88 +252,73 @@ module internal Exec =
       command.Parameters.Add dbParam |> ignore )
     dialect.MakeParamDisposer command
 
-  let handleCommand (dialect: IDialect) (stmt:PreparedStatement) command commandHandler =
+  let execute ({Config = {Dialect = dialect; Listener = listener}; Connection = con; Transaction = tx} as ctx) stmt commandHandler = 
+    let con = confirmOpen con
+    use command = con.CreateCommand()
+    use paramsDisposer = setupCommand ctx stmt command
+    let txId = Option.map (fun tx -> tx.GetHashCode()) tx
+    listener (Sql (txId, stmt))
     try
       commandHandler command
-    with
-    | ex -> 
+    with ex -> 
       if dialect.IsUniqueConstraintViolation(ex) then
         raise <| UniqueConstraintError (stmt, ex.Message, ex)
       else 
         reraise()
 
-  let execute ({Config = {Dialect = dialect; Listener = listener}; Connection = con; Transaction = tx} as ctx) stmt commandHandler = 
-    let confirmOpen (con: DbConnection) =
-      if con.State <> ConnectionState.Open then
-        con.Open()
-      con
+  let executeDifferred ({Config = {Dialect = dialect; Listener = listener}; Connection = con; Transaction = tx} as ctx) stmt commandHandler = 
     seq {
       let con = confirmOpen con
       use command = con.CreateCommand()
       use paramsDisposer = setupCommand ctx stmt command
       let txId = Option.map (fun tx -> tx.GetHashCode()) tx
       listener (Sql (txId, stmt))
-      yield! handleCommand dialect stmt command commandHandler }
+      yield! commandHandler command }
 
-  let executeCommand<'T> ctx stmt (commandHandler:DbCommand -> 'T) = 
-    execute ctx stmt (fun command -> seq { yield commandHandler command })
-    |> Seq.head
+  let executeNonQuery ({Config = {Dialect = dialect}} as ctx) stmt =
+    execute ctx stmt (fun command -> command.ExecuteNonQuery())
 
+  let executeScalar ctx stmt =
+    execute ctx stmt (fun command -> command.ExecuteScalar())
+  
   let executeReader<'T> ({Config = {Dialect = dialect}} as ctx) stmt (readerHandler: DbDataReader -> 'T seq) = 
-    execute ctx stmt (fun command -> seq { 
-      use reader = handleCommand dialect stmt command (fun command -> command.ExecuteReader())
+    execute ctx stmt (fun command -> 
+      use reader = command.ExecuteReader()
+      if not dialect.IsHasRowsPropertySupported || reader.HasRows then
+        readerHandler reader |> Seq.toList
+      else
+        List.empty)
+
+  let executeReaderDifferred<'T> ({Config = {Dialect = dialect}} as ctx) stmt (readerHandler: DbDataReader -> 'T seq) = 
+    executeDifferred ctx stmt (fun command -> seq { 
+      use reader = command.ExecuteReader()
       if not dialect.IsHasRowsPropertySupported || reader.HasRows then
         yield! readerHandler reader
       else
         yield! Seq.empty })
 
-  let executeReaderAndScalar<'T> ({Config = {Dialect = dialect; Listener = listener}; Transaction = tx} as ctx) readerStmt (readerHandler: DbDataReader -> 'T seq) scalarStmt = 
-    executeCommand ctx readerStmt (fun command -> 
-      let results =
-        use reader = handleCommand dialect readerStmt command (fun command -> command.ExecuteReader())
-        if not dialect.IsHasRowsPropertySupported || reader.HasRows then
-          List.ofSeq (readerHandler reader)
-        else
-          []
-      use command = command.Connection.CreateCommand()
-      use paramsDisposer = setupCommand ctx scalarStmt command
-      let txId = Option.map (fun tx -> tx.GetHashCode()) tx
-      listener (Sql (txId, scalarStmt))
-      let scalarResult = handleCommand dialect scalarStmt command (fun command -> command.ExecuteScalar())
-      results, scalarResult )
-
-  let executeReaderWitUserHandler ({Config = {Dialect = dialect}} as ctx) stmt handler =
-    executeCommand ctx stmt (fun command -> 
-      use reader = handleCommand dialect stmt command (fun command -> command.ExecuteReader())
-      handler reader )
-
-  let executeNonQuery ctx stmt =
-    executeCommand ctx stmt (fun command -> command.ExecuteNonQuery())
-
-  let executeScalar ctx stmt =
-    executeCommand ctx stmt (fun command -> command.ExecuteScalar())
+  let executeReaderWitUserHandler ({Config = {Dialect = dialect}} as ctx) stmt readerHandler =
+    execute ctx stmt (fun command ->
+      use reader = command.ExecuteReader()
+      readerHandler reader |> Seq.toList)
 
   let executeAndGetFirst<'T> ctx stmt (readerHandler: DbDataReader -> 'T seq) =
-    let results = 
-      executeReader<'T> ctx stmt (fun reader -> Seq.truncate 1 (readerHandler reader))
-      |> Seq.toList
-    if results.IsEmpty then
-      DbHelper.raiseNoAffectedRowError stmt
-    else
-      results.Head
+    executeReader<'T> ctx stmt (fun reader -> Seq.truncate 1 (readerHandler reader))
+    |> Seq.toList
+    |> function 
+      | [] -> DbHelper.raiseNoAffectedRowError stmt
+      | h :: _ -> h
 
   let executeAndGetVersionAtOnce ctx dialect entity (entityMeta:EntityMeta) (versionPropMeta:PropMeta) stmt =
     let versionStmt = DbHelper.prepareVersionSelect dialect entity entityMeta versionPropMeta
     let stmt = DbHelper.appendPreparedStatements stmt versionStmt
-    let readerHandler (reader:DbDataReader) =
+    executeAndGetFirst<_> ctx stmt <| fun reader ->
       seq { while reader.Read() do yield dialect.GetValue(reader, 0, versionPropMeta.Property) }
-    executeAndGetFirst<_> ctx stmt readerHandler
 
   let getVersionOnly ctx dialect entity (entityMeta:EntityMeta) (versionPropMeta:PropMeta) =
     let stmt = DbHelper.prepareVersionSelect dialect entity entityMeta versionPropMeta
-    let readerHandler (reader:DbDataReader) =
+    executeAndGetFirst<_> ctx stmt <| fun reader ->
       seq { while reader.Read() do yield dialect.GetValue(reader, 0, versionPropMeta.Property) }
-    executeAndGetFirst<_> ctx stmt readerHandler
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
@@ -360,8 +350,9 @@ module internal Script =
   let paginateAndCount<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters (offset, limit)  = 
     let readerHandler = getReaderHandler<'T> dialect
     let pagenageStmt, countStmt = Sql.preparePaginateAndCount dialect sql parameters offset limit
-    let results, count = Exec.executeReaderAndScalar<'T> ctx pagenageStmt readerHandler countStmt
-    results |> Seq.toList, Convert.ChangeType(count, typeof<int64>) :?> int64
+    let rows = Exec.executeReader<'T> ctx pagenageStmt readerHandler
+    let count = Exec.executeScalar ctx countStmt
+    rows, Convert.ChangeType(count, typeof<int64>) :?> int64
 
   let execute ({Config = {Dialect = dialect}} as ctx) sql parameters  = 
     let stmt = Sql.prepare dialect sql parameters
@@ -398,16 +389,10 @@ module internal Auto =
   let tryFind<'T when 'T : not struct> ({Config = config} as ctx) idList = 
     validateType<'T>
     let stmt, readerHandler, entityMeta = get<'T> config idList
-    let results = Exec.executeReader ctx stmt readerHandler
-    use enumerator = results.GetEnumerator()
-    if enumerator.MoveNext() then
-      let entity = enumerator.Current
-      if enumerator.MoveNext() then
-        raise <| DbException(SR.TRANQ4016 (stmt.Text, stmt.Params)) 
-      else
-        Found entity
-    else
-      NotFound stmt
+    match Exec.executeReader ctx stmt readerHandler with
+    | [] -> NotFound stmt
+    | entity :: [] -> Found entity
+    | _ -> raise <| DbException(SR.TRANQ4016 (stmt.Text, stmt.Params)) 
 
   let private validateOptimisticLock version entity (versionPropMeta:PropMeta option) stmt =
     match versionPropMeta with
@@ -421,17 +406,12 @@ module internal Auto =
   let tryFindWithVersion<'T when 'T : not struct> ({Config = config} as ctx) idList version = 
     validateType<'T>
     let stmt, readerHandler, entityMeta = get<'T> config idList
-    let results = Exec.executeReader<'T> ctx stmt readerHandler
-    use enumerator = results.GetEnumerator()
-    if enumerator.MoveNext() then
-      let entity = enumerator.Current
-      if enumerator.MoveNext() then
-        raise <| DbException(SR.TRANQ4016 (stmt.Text, stmt.Params)) 
-      else
-        validateOptimisticLock version entity entityMeta.VersionPropMeta stmt
-        Found entity
-    else
-      NotFound stmt
+    match Exec.executeReader<'T> ctx stmt readerHandler with
+    | [] -> NotFound stmt
+    | entity :: [] -> 
+      validateOptimisticLock version entity entityMeta.VersionPropMeta stmt
+      Found entity
+    | _ -> raise <| DbException(SR.TRANQ4016 (stmt.Text, stmt.Params)) 
 
   let private preInsert<'T> ({Config = {Dialect = dialect}} as ctx) (entity:'T) (entityMeta:EntityMeta) =
     let contextKey = ctx.Connection.ConnectionString
@@ -589,7 +569,7 @@ module internal Auto =
       DbHelper.convertFromDbToClr dialect dbValue paramMeta.Type paramMeta.UdtTypeName paramMeta.Property (fun exn ->
         let typ = if dbValue = null then typeof<obj> else dbValue.GetType()
         raise <| DbException(SR.TRANQ4023(typ.FullName, paramMeta.ParamName, procedureMeta.ProcedureName, paramMeta.Type.FullName), exn) )
-    Exec.executeCommand ctx stmt (fun command ->
+    Exec.execute ctx stmt (fun command ->
       command.CommandType <- CommandType.StoredProcedure
       let procedureAry = Array.zeroCreate (procedureMeta.ProcedureParamMetaList.Length)
       using (command.ExecuteReader()) (fun reader ->
@@ -611,8 +591,7 @@ module internal Auto =
         finally
           try
             while reader.NextResult() do ()
-          with
-          | _ -> () )
+          with _ -> () )
       procedureMeta.ProcedureParamMetaList
       |> Seq.filter (fun paramMeta -> 
         match paramMeta.ParamMetaCase with
@@ -639,13 +618,13 @@ module Db =
   let query<'T> sql parameters = Tx(fun ctx state -> 
     Guard.argNotNull (sql, "sql") 
     Guard.argNotNull (parameters, "parameters")
-    let ret = Script.query<'T> ctx sql parameters |> Seq.toList
+    let ret = Script.query<'T> ctx sql parameters
     Success ret, state)
 
   let paginate<'T> sql parameters (offset, limit) = Tx(fun ctx state -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters") 
-    let ret = Script.paginate<'T> ctx sql parameters (offset, limit) |> Seq.toList
+    let ret = Script.paginate<'T> ctx sql parameters (offset, limit)
     Success ret, state)
 
   let paginateAndCount<'T> sql parameters (offset, limit) = Tx(fun ctx state -> 
@@ -670,7 +649,7 @@ module Db =
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
     Guard.argNotNull (handler, "handler")
-    let ret = Script.executeReader<'T> ctx sql parameters handler |> Seq.toList
+    let ret = Script.executeReader<'T> ctx sql parameters handler
     Success ret, state)
 
   let find<'T when 'T : not struct> id = Tx(fun ctx state -> 

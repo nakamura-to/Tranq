@@ -503,13 +503,13 @@ module Sql =
   let inline private isTargetPropMeta (entity:obj) (opt: ^a) (propMeta:PropMeta) customExclusionRule =
     let exclud = (^a : (member Exclude: seq<string>) opt)
     let includ = (^a : (member Include: seq<string>) opt)
-    let excludeNull = (^a : (member ExcludeNull: bool) opt)
+    let excludeNone = (^a : (member ExcludeNone: bool) opt)
     let propName = propMeta.PropName
     if customExclusionRule(propMeta.PropCase) then
       false
     elif (match propMeta.PropCase with Version _ -> true | _ -> false) then
       true
-    elif excludeNull && propMeta.GetValue(entity) = null then
+    elif excludeNone && propMeta.GetValue(entity) = null then
       false
     elif not <| Seq.isEmpty includ then
       Seq.exists ((=) propName) includ &&  not <| Seq.exists ((=) propName) exclud

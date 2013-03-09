@@ -989,7 +989,7 @@ module SqlTest =
   [<Test>]
   let ``prepareInsert : exclude null`` () =
     let meta = EntityMeta.make typeof<Hoge5> dialect
-    let ps = Sql.prepareInsert dialect { Hoge5.Id = 1; Name = Some "aaa"; Age = None; Salary = None; Version= 10 } meta (InsertOpt(ExcludeNull = true))
+    let ps = Sql.prepareInsert dialect { Hoge5.Id = 1; Name = Some "aaa"; Age = None; Salary = None; Version= 10 } meta (InsertOpt(ExcludeNone = true))
     assert_equal "insert into Hoge5 ( Name, Version ) values ( @p0, @p1 )" ps.Text
     assert_equal 2 ps.Params.Length
     assert_equal "aaa" ps.Params.[0].Value
@@ -1037,7 +1037,7 @@ module SqlTest =
         dialect 
         { Hoge7.Id = 0; Name = None; Version= 0 } 
         meta 
-        (InsertOpt(ExcludeNull = true)) |> ignore
+        (InsertOpt(ExcludeNone = true)) |> ignore
       fail ()
     with
     | :? SqlException as ex when ex.MessageId = "TRANQ4024"->
@@ -1078,7 +1078,7 @@ module SqlTest =
   [<Test>]
   let ``prepareUpdate : eclude null `` () =
     let meta = EntityMeta.make typeof<Hoge6> dialect
-    let ps = Sql.prepareUpdate dialect { Hoge6.Id = 1; Name = Some "aaa"; Age = None; Salary = None; Version= 10 } meta (UpdateOpt(ExcludeNull = true))
+    let ps = Sql.prepareUpdate dialect { Hoge6.Id = 1; Name = Some "aaa"; Age = None; Salary = None; Version= 10 } meta (UpdateOpt(ExcludeNone = true))
     assert_equal "update Hoge6 set Name = @p0, Version = Version + 1 where Id = @p1 and Version = @p2" ps.Text
     assert_equal 3 ps.Params.Length
     assert_equal "aaa" ps.Params.[0].Value

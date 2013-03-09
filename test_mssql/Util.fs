@@ -43,3 +43,11 @@ module Assert =
   let isEqualTo expected actual =
     if expected <> actual then
       failwithf "expected:\n%A\nactual:\n%A" expected actual
+
+  let isTrue actual =
+    if actual <> true then
+      failwithf "expected: true"
+
+  let isFalse actual =
+    if actual <> false then
+      failwithf "expected: false"

@@ -187,12 +187,12 @@ type IDialect =
 type InsertOpt() =
   member val Exclude: string seq = Seq.empty with get, set
   member val Include: string seq = Seq.empty with get,set
-  member val ExcludeNull = false with get, set
+  member val ExcludeNone = false with get, set
 
 type UpdateOpt() =
   member val Exclude: string seq = Seq.empty with get, set
   member val Include: string seq = Seq.empty with get,set
-  member val ExcludeNull = false with get, set
+  member val ExcludeNone = false with get, set
   member val IgnoreVersion = false with get, set
 
 type DeleteOpt() =
