@@ -253,6 +253,17 @@ module internal Type =
   let isNumber = Number.isNumberType
 
 [<AutoOpen>]
+module internal Extension =
+
+  open System.Data
+  open System.Data.Common
+  
+  type DbConnection with
+    member this.ConfirmOpen() =
+      if this.State <> ConnectionState.Open then
+        this.Open()
+
+[<AutoOpen>]
 module internal Util =
   
   let inline (+>) (buf:StringBuilder) (text:string) = buf.Append(text)

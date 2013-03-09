@@ -293,10 +293,6 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
     | RepeatableRead -> System.Data.IsolationLevel.RepeatableRead
     | Serializable -> System.Data.IsolationLevel.Serializable
     | Snapshot -> System.Data.IsolationLevel.Snapshot
-  let confirmOpen (con: DbConnection) =
-    if con.State <> ConnectionState.Open then
-      con.Open()
-    con
   member this.Return(x) = TxHelper.returnM x
   member this.ReturnFrom(m) = m
   member this.Bind(m, f) = TxHelper.bindM m f
@@ -349,13 +345,14 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
       run ctx state
     | Required, None
     | RequiresNew, None ->
-      let con = confirmOpen con
+      con.ConfirmOpen()
       use tx = con.BeginTransaction(toAdoTx txIsolatioinLevel)
       begin_ tx
       let result, state = run {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
       completeTx tx result state
     | RequiresNew, Some _ ->
-      use con = confirmOpen (config.ConnectionProvider())
+      use con = config.ConnectionProvider()
+      con.ConfirmOpen()
       use tx = con.BeginTransaction(toAdoTx txIsolatioinLevel)
       begin_ tx
       let result, state = run {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
@@ -363,7 +360,8 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
     | Supports, _ ->
       run ctx state
     | NotSupported, _ -> 
-      use con = confirmOpen (config.ConnectionProvider())
+      use con = config.ConnectionProvider()
+      con.ConfirmOpen()
       run {ctx with Connection = con; Transaction = None } {IsRollbackOnly = false})
 
 exception Abort of string

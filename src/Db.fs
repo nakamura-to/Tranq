@@ -235,13 +235,6 @@ module internal DbHelper =
   let makeEntityNotFoundError {Text = text; Params = paramerters} =
     DbException(SR.TRANQ4015(text, paramerters))
 
-module internal Exec =
-
-  let confirmOpen (con: DbConnection) =
-    if con.State <> ConnectionState.Open then
-      con.Open()
-    con
-
   let setupCommand {Config = {Dialect = dialect}; Transaction = tx} (stmt:PreparedStatement) (command:DbCommand) =
     Option.iter (fun tx -> command.Transaction <- tx) tx
     command.CommandText <- stmt.Text
@@ -252,10 +245,12 @@ module internal Exec =
       command.Parameters.Add dbParam |> ignore )
     dialect.MakeParamDisposer command
 
+module internal Exec =
+
   let execute ({Config = {Dialect = dialect; Listener = listener}; Connection = con; Transaction = tx} as ctx) stmt commandHandler = 
-    let con = confirmOpen con
+    con.ConfirmOpen()
     use command = con.CreateCommand()
-    use paramsDisposer = setupCommand ctx stmt command
+    use paramsDisposer = DbHelper.setupCommand ctx stmt command
     let txId = Option.map (fun tx -> tx.GetHashCode()) tx
     listener (Sql (txId, stmt))
     try
@@ -265,15 +260,6 @@ module internal Exec =
         raise <| UniqueConstraintError (stmt, ex.Message, ex)
       else 
         reraise()
-
-  let executeDifferred ({Config = {Dialect = dialect; Listener = listener}; Connection = con; Transaction = tx} as ctx) stmt commandHandler = 
-    seq {
-      let con = confirmOpen con
-      use command = con.CreateCommand()
-      use paramsDisposer = setupCommand ctx stmt command
-      let txId = Option.map (fun tx -> tx.GetHashCode()) tx
-      listener (Sql (txId, stmt))
-      yield! commandHandler command }
 
   let executeNonQuery ({Config = {Dialect = dialect}} as ctx) stmt =
     execute ctx stmt (fun command -> command.ExecuteNonQuery())
@@ -288,14 +274,6 @@ module internal Exec =
         readerHandler reader |> Seq.toList
       else
         List.empty)
-
-  let executeReaderDifferred<'T> ({Config = {Dialect = dialect}} as ctx) stmt (readerHandler: DbDataReader -> 'T seq) = 
-    executeDifferred ctx stmt (fun command -> seq { 
-      use reader = command.ExecuteReader()
-      if not dialect.IsHasRowsPropertySupported || reader.HasRows then
-        yield! readerHandler reader
-      else
-        yield! Seq.empty })
 
   let executeReaderWitUserHandler<'T> ({Config = {Dialect = dialect}} as ctx) stmt (readerHandler: DbDataReader -> 'T) =
     execute ctx stmt (fun command ->
@@ -319,6 +297,25 @@ module internal Exec =
     let stmt = DbHelper.prepareVersionSelect dialect entity entityMeta versionPropMeta
     executeAndGetFirst<_> ctx stmt <| fun reader ->
       seq { while reader.Read() do yield dialect.GetValue(reader, 0, versionPropMeta.Property) }
+
+module internal ExecDifferred =
+
+  let execute ({Config = {Dialect = dialect; Listener = listener}; Connection = con; Transaction = tx} as ctx) stmt commandHandler = 
+    seq {
+      con.ConfirmOpen()
+      use command = con.CreateCommand()
+      use paramsDisposer = DbHelper.setupCommand ctx stmt command
+      let txId = Option.map (fun tx -> tx.GetHashCode()) tx
+      listener (Sql (txId, stmt))
+      yield! commandHandler command }
+
+  let executeReader<'T> ({Config = {Dialect = dialect}} as ctx) stmt (readerHandler: DbDataReader -> 'T seq) = 
+    execute ctx stmt (fun command -> seq { 
+      use reader = command.ExecuteReader()
+      if not dialect.IsHasRowsPropertySupported || reader.HasRows then
+        yield! readerHandler reader
+      else
+        yield! Seq.empty })
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
