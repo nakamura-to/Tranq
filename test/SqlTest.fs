@@ -626,7 +626,7 @@ module SqlTest =
         /*% end */
         order by
           aaa.id
-        " [Param("seq", seq, typeof<int list>)] 1L 10L
+        " [Param("seq", seq, typeof<int list>)] <| PaginateOpt(Offset = 1L, Limit = 10L)
     printfn "%s" ps.Text
     let sql = "select * from ( select temp_.*, row_number() over( order by
           temp_.id

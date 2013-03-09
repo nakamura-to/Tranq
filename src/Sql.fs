@@ -458,21 +458,21 @@ module Sql =
     let env = concatEnv dialect.Env (makeEnv parameters)
     prepareCore dialect sql env
 
-  let preparePaginate (dialect: IDialect) sql parameters offset limit  =
+  let preparePaginate (dialect: IDialect) sql parameters (opt: PaginateOpt)  =
     let statement = dialect.ParseSql sql
     let env = concatEnv dialect.Env (makeEnv parameters)
     let sql = resolveOrderByEmbeddedVariables sql env statement
     let statement = dialect.ParseSql sql
-    let sql, env = dialect.RewriteForPagination (statement, sql, env, offset, limit)
+    let sql, env = dialect.RewriteForPagination (statement, sql, env, opt.Offset, opt.Limit)
     let env = concatEnv dialect.Env env
     prepareCore dialect sql env
 
-  let preparePaginateAndCount (dialect: IDialect) sql parameters offset limit =
+  let preparePaginateAndCount (dialect: IDialect) sql parameters (opt: PaginateOpt) =
     let statement = dialect.ParseSql sql
     let env = concatEnv dialect.Env (makeEnv parameters)
     let sql = resolveOrderByEmbeddedVariables sql env statement
     let statement = dialect.ParseSql sql
-    let newSql, newEnv = dialect.RewriteForCalcPagination (statement, sql, env, offset, limit)
+    let newSql, newEnv = dialect.RewriteForCalcPagination (statement, sql, env, opt.Offset, opt.Limit)
     let newEnv = concatEnv dialect.Env newEnv
     let paginatePs = prepareCore dialect newSql newEnv
     let newSql, newEnv = dialect.RewriteForCount (statement, sql, env)

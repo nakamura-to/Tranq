@@ -342,14 +342,14 @@ module internal Script =
     let stmt = Sql.prepare dialect sql parameters
     Exec.executeReader<'T> ctx stmt handler
 
-  let paginate<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters (offset, limit) = 
+  let paginate<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters opt = 
     let handler = getReaderHandler<'T> dialect
-    let stmt = Sql.preparePaginate dialect sql parameters offset limit
+    let stmt = Sql.preparePaginate dialect sql parameters opt
     Exec.executeReader<'T> ctx stmt handler
 
-  let paginateAndCount<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters (offset, limit)  = 
+  let paginateAndCount<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters opt = 
     let readerHandler = getReaderHandler<'T> dialect
-    let pagenageStmt, countStmt = Sql.preparePaginateAndCount dialect sql parameters offset limit
+    let pagenageStmt, countStmt = Sql.preparePaginateAndCount dialect sql parameters opt
     let rows = Exec.executeReader<'T> ctx pagenageStmt readerHandler
     let count = Exec.executeScalar ctx countStmt
     rows, Convert.ChangeType(count, typeof<int64>) :?> int64
@@ -622,16 +622,16 @@ module Db =
     let ret = Script.query<'T> ctx sql parameters
     Success ret, state)
 
-  let paginate<'T> sql parameters (offset, limit) = Tx(fun ctx state -> 
+  let paginate<'T> sql parameters opt = Tx(fun ctx state -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters") 
-    let ret = Script.paginate<'T> ctx sql parameters (offset, limit)
+    let ret = Script.paginate<'T> ctx sql parameters opt
     Success ret, state)
 
-  let paginateAndCount<'T> sql parameters (offset, limit) = Tx(fun ctx state -> 
+  let paginateAndCount<'T> sql parameters opt = Tx(fun ctx state -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
-    let ret = Script.paginateAndCount<'T> ctx sql parameters (offset, limit) 
+    let ret = Script.paginateAndCount<'T> ctx sql parameters opt
     Success ret, state)
 
   let execute sql parameters = Tx(fun ctx state -> 

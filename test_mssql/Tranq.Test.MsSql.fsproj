@@ -53,6 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Util.fs" />
+    <Compile Include="PaginateTest.fs" />
     <Compile Include="FindTest.fs" />
     <Compile Include="InsertTest.fs" />
     <Compile Include="UpdateTest.fs" />
