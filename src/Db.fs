@@ -378,8 +378,6 @@ module internal Script =
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module internal Auto =
 
-  type FindResult<'T> = Found of 'T | NotFound of PreparedStatement
-
   let private validateType<'T> =
     let typ = typeof<'T>
     if not <| Type.isRecord typ then
@@ -399,6 +397,8 @@ module internal Auto =
     let stmt = Sql.prepareFind dialect idList entityMeta
     stmt, readerHandler, entityMeta
 
+  type FindResult<'T> = Found of 'T | NotFound of PreparedStatement
+
   let tryFind<'T when 'T : not struct> ({Config = config} as ctx) idList = 
     validateType<'T>
     let stmt, readerHandler, entityMeta = get<'T> config idList
@@ -407,23 +407,23 @@ module internal Auto =
     | entity :: [] -> Found entity
     | _ -> raise <| DbException(SR.TRANQ4016 (stmt.Text, stmt.Params)) 
 
-  let private validateOptimisticLock version entity (versionPropMeta:PropMeta option) stmt =
-    match versionPropMeta with
-    | Some versionPropMeta ->
-      let actualVersion = versionPropMeta.GetValue (upcast entity)
-      if actualVersion = null || not <| actualVersion.Equals(version) then
-        raise <| OptimisticLockError stmt
-    | _ -> 
-      raise <| OptimisticLockError stmt
+  type FindWithVersionResult<'T> = VersionFound of 'T | VersionNotFound of PreparedStatement | VersionConflicted of PreparedStatement
 
   let tryFindWithVersion<'T when 'T : not struct> ({Config = config} as ctx) idList version = 
     validateType<'T>
     let stmt, readerHandler, entityMeta = get<'T> config idList
     match Exec.executeReader<'T> ctx stmt readerHandler with
-    | [] -> NotFound stmt
-    | entity :: [] -> 
-      validateOptimisticLock version entity entityMeta.VersionPropMeta stmt
-      Found entity
+    | [] -> VersionNotFound stmt
+    | entity :: [] ->
+      match entityMeta.VersionPropMeta with
+      | Some versionPropMeta ->
+        let actualVersion = versionPropMeta.GetValue (upcast entity)
+        if actualVersion = null || not <| actualVersion.Equals(version) then
+          VersionConflicted stmt
+        else
+          VersionFound entity
+      | _ -> 
+        VersionFound entity
     | _ -> raise <| DbException(SR.TRANQ4016 (stmt.Text, stmt.Params)) 
 
   let private preInsert<'T> ({Config = {Dialect = dialect}} as ctx) (entity:'T) (entityMeta:EntityMeta) =
@@ -626,14 +626,17 @@ module internal Auto =
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+/// Operations on the Database.
 module Db =
-  
+
+  /// <summary>Queries rows.</summary>
   let query<'T> sql parameters = Tx(fun ctx state -> 
     Guard.argNotNull (sql, "sql") 
     Guard.argNotNull (parameters, "parameters")
     let ret = Script.query<'T> ctx sql parameters
     Success ret, state)
 
+  /// <summary>Paginates rows.</summary>
   let paginate<'T> sql parameters range = Tx(fun ctx state -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
@@ -641,6 +644,7 @@ module Db =
     let ret = Script.paginate<'T> ctx sql parameters range
     Success ret, state)
 
+  /// <summary>Paginates rows and counts rows without a range condition.</summary>
   let paginateAndCount<'T> sql parameters range = Tx(fun ctx state -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
@@ -648,6 +652,7 @@ module Db =
     let ret = Script.paginateAndCount<'T> ctx sql parameters range
     Success ret, state)
 
+  /// <summary>Iterates rows with an internal iterator.</summary>
   let iterate<'T> sql parameters range handler = Tx(fun ctx state -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
@@ -655,18 +660,21 @@ module Db =
     let ret = Script.iterate<'T> ctx sql parameters range handler
     Success ret, state)
 
+  /// <summary>Executes an arbitrary SQL.</summary>
   let execute sql parameters = Tx(fun ctx state -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
     let ret = Script.execute ctx sql parameters 
     Success ret, state)
 
+  /// <summary>executes an arbitrary SQL and discards the result.</summary>
   let run sql parameters = Tx(fun ctx state -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
     Script.execute ctx sql parameters |> ignore
     Success (), state)
 
+  /// <summary>Executes and handle a DbDataReader object.</summary>
   let executeReader<'T> sql parameters readerHandler = Tx(fun ctx state ->
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
@@ -674,12 +682,17 @@ module Db =
     let ret = Script.executeReader<'T> ctx sql parameters readerHandler
     Success ret, state)
 
+  /// <summary>Finds an entity by identifier.</summary>
+  /// <exception cref="Tranq.EntityNotFoundError">Thrown when an entity is not found.</exception>
   let find<'T when 'T : not struct> id = Tx(fun ctx state -> 
     Guard.argNotNull (id, "id")
     match Auto.tryFind<'T> ctx id with
-    | Auto.Found value -> Success value, state
-    | Auto.NotFound stmt -> raise <| EntityNotFoundError stmt)
+    | Auto.Found value ->
+      Success value, state
+    | Auto.NotFound stmt ->
+      raise <| EntityNotFoundError stmt)
 
+  /// <summary>Trys to find an entity by identifier.</summary>
   let tryFind<'T when 'T : not struct> id = Tx(fun ctx state -> 
     Guard.argNotNull (id, "id")
     match Auto.tryFind<'T> ctx id with
@@ -688,55 +701,78 @@ module Db =
     | Auto.NotFound _ -> 
       Success None, state)
 
+  /// <summary>Finds an entity by identifier and version.</summary>
+  /// <exception cref="Tranq.EntityNotFoundError">Thrown when an entity is not found.</exception>
+  /// <exception cref="Tranq.OptimisticLockError">Thrown when an optimistic lock error is detected.</exception>
   let findWithVersion<'T when 'T : not struct> id version = Tx(fun ctx state -> 
     Guard.argNotNull (id, "id")
     match Auto.tryFindWithVersion<'T> ctx id version with
-    | Auto.Found value -> 
+    | Auto.VersionFound value -> 
       Success value, state
-    | Auto.NotFound stmt -> 
-      raise <| EntityNotFoundError stmt)
+    | Auto.VersionNotFound stmt ->
+      raise <| EntityNotFoundError stmt
+    | Auto.VersionConflicted stmt ->
+      raise <| OptimisticLockError stmt)
 
+  /// <summary>Trys to find an entity by identifier and version.</summary>
   let tryFindWithVersion<'T when 'T : not struct> id version = Tx(fun ctx state -> 
     Guard.argNotNull (id, "id")
     match Auto.tryFindWithVersion<'T> ctx id version with
-    | Auto.Found value -> 
+    | Auto.VersionFound value -> 
       Success (Some value), state
-    | Auto.NotFound _ -> 
+    | Auto.VersionNotFound _ 
+    | Auto.VersionConflicted _-> 
       Success None, state)
 
+  /// <summary>Inserts an entity.</summary>
+  /// <exception cref="Tranq.UniqueConstraintError">Thrown when an unique constraint violation is detected.</exception>
   let insert<'T when 'T : not struct> (entity: 'T) = Tx(fun ctx state -> 
     Guard.argNotNull (entity, "entity")
     let ret = Auto.insert ctx entity (InsertOpt())
     Success ret, state)
 
+  /// <summary>Inserts an entity with option.</summary>
+  /// <exception cref="Tranq.UniqueConstraintError">Thrown when an unique constraint violation is detected.</exception>
   let insertWithOpt<'T when 'T : not struct> (entity: 'T) opt = Tx(fun ctx state -> 
     Guard.argNotNull (entity, "entity")
     Guard.argNotNull (opt, "opt") 
     let ret = Auto.insert ctx entity opt
     Success ret, state)
 
+  /// <summary>Updates an entity.</summary>
+  /// <exception cref="Tranq.UniqueConstraintError">Thrown when an unique constraint violation is detected.</exception>
+  /// <exception cref="Tranq.OptimisticLockError">Thrown when an optimistic lock error is detected.</exception>
   let update<'T when 'T : not struct> (entity: 'T) = Tx(fun ctx state -> 
     Guard.argNotNull (entity, "entity")
     let ret = Auto.update ctx entity (UpdateOpt())
     Success ret, state)
 
+  /// <summary>Updates an entity with option.</summary>
+  /// <exception cref="Tranq.UniqueConstraintError">Thrown when an unique constraint violation is detected.</exception>
+  /// <exception cref="Tranq.OptimisticLockError">Thrown when an optimistic lock error is detected.</exception>
   let updateWithOpt<'T when 'T : not struct> (entity: 'T) opt = Tx(fun ctx state -> 
     Guard.argNotNull (entity, "entity")
     Guard.argNotNull (opt, "opt") 
     let ret = Auto.update ctx entity opt
     Success ret, state)
 
+  /// <summary>Deletes an entity.</summary>
+  /// <exception cref="Tranq.OptimisticLockError">Thrown when an optimistic lock error is detected.</exception>
   let delete<'T when 'T : not struct> (entity: 'T) = Tx(fun ctx state -> 
     Guard.argNotNull (entity, "entity")
     let ret = Auto.delete ctx entity (DeleteOpt())
     Success ret, state)
 
+  /// <summary>Deletes an entity with option.</summary>
+  /// <exception cref="Tranq.OptimisticLockError">Thrown when an optimistic lock error is detected.</exception>
   let deleteWithOpt<'T when 'T : not struct> (entity: 'T) opt = Tx(fun ctx state -> 
     Guard.argNotNull (entity, "entity")
     Guard.argNotNull (opt, "opt") 
     let ret = Auto.delete ctx entity opt
     Success ret, state)
 
+  /// <summary>Calls a stored procedure or a stored function.</summary>
+  /// <exception cref="Tranq.UniqueConstraintError">Thrown when an unique constraint violation is detected.</exception>
   let call<'T when 'T : not struct> (procedure: 'T) = Tx(fun ctx state -> 
     Guard.argNotNull (procedure, "procedure")
     let ret = Auto.call ctx procedure
