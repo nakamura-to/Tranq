@@ -43,6 +43,15 @@ exception UniqueConstraintError of PreparedStatement * string * exn with
     | _ -> 
       Unchecked.defaultof<_>
 
+exception EntityNotFoundError of PreparedStatement with
+  override this.Message =
+    match this :> exn with
+    | EntityNotFoundError(stmt) -> 
+      let message = SR.TRANQ4015 (stmt.Text, stmt.Params)
+      Message.format message
+    | _ -> 
+      Unchecked.defaultof<_>
+
 type DbException (message, ?innerException:exn) =
   inherit InvalidOperationException (Message.format message, match innerException with Some ex -> ex | _ -> null)
   member this.MessageId = message.Id
@@ -231,9 +240,6 @@ module internal DbHelper =
 
   let raiseNoAffectedRowError {Text = text; Params = parameters} =
     raise <| DbException(SR.TRANQ4011 (text, parameters))
-
-  let makeEntityNotFoundError {Text = text; Params = paramerters} =
-    DbException(SR.TRANQ4015(text, paramerters))
 
   let setupCommand {Config = {Dialect = dialect}; Transaction = tx} (stmt:PreparedStatement) (command:DbCommand) =
     Option.iter (fun tx -> command.Transaction <- tx) tx
@@ -672,7 +678,7 @@ module Db =
     Guard.argNotNull (id, "id")
     match Auto.tryFind<'T> ctx id with
     | Auto.Found value -> Success value, state
-    | Auto.NotFound stmt -> Failure (DbHelper.makeEntityNotFoundError stmt), state)
+    | Auto.NotFound stmt -> raise <| EntityNotFoundError stmt)
 
   let tryFind<'T when 'T : not struct> id = Tx(fun ctx state -> 
     Guard.argNotNull (id, "id")
@@ -688,7 +694,7 @@ module Db =
     | Auto.Found value -> 
       Success value, state
     | Auto.NotFound stmt -> 
-      Failure (DbHelper.makeEntityNotFoundError stmt), state)
+      raise <| EntityNotFoundError stmt)
 
   let tryFindWithVersion<'T when 'T : not struct> id version = Tx(fun ctx state -> 
     Guard.argNotNull (id, "id")

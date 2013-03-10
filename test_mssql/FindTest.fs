@@ -111,8 +111,23 @@ module FindTest =
     | Success ret -> 
       failwith "not expected"
     | Failure e -> 
-      // TODO
-      messageId e |> isEqualTo "TRANQ4015"
+      match e with
+      | EntityNotFoundError _ -> ()
+      | _ -> raise <| Exception("", e)
+
+  [<Test>]
+  let ``find : not found : try with``() =
+    Runner.rollbackOnly <| txSupports {
+      try
+        do! Db.find<Department> [99] |> Tx.ignore
+        return true
+      with
+        | EntityNotFoundError _ -> return false }
+    |> function
+    | Success ret -> 
+      ret |> isFalse
+    | Failure e -> 
+      raise <| Exception("", e)
 
   [<Test>]
   let ``find : by empty id``() =
@@ -192,8 +207,23 @@ module FindTest =
     | Success ret -> 
       failwith "not expected"
     | Failure e -> 
-      // TODO
-      messageId e |> isEqualTo "TRANQ4015"
+      match e with
+      | EntityNotFoundError _ -> ()
+      | _ -> raise <| Exception("", e)
+
+  [<Test>]
+  let ``findWithVersion : not found : try with``() =
+    Runner.rollbackOnly <| txSupports { 
+      try
+        do! Db.findWithVersion<Department> [99] 0 |> Tx.ignore
+        return true
+      with
+        | EntityNotFoundError _ -> return false }
+    |> function
+    | Success ret -> 
+      ret |> isFalse
+    | Failure e -> 
+      raise <| Exception("", e)
 
   [<Test>]
   let ``findWithVersion : optimistic lock confliction``() =
