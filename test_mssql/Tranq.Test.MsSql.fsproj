@@ -62,6 +62,7 @@
     <Compile Include="UpdateTest.fs" />
     <Compile Include="DeleteTest.fs" />
     <Compile Include="CallTest.fs" />
+    <Compile Include="MappingTest.fs" />
     <None Include="create.sql" />
     <None Include="packages.config" />
     <Compile Include="QueryTest.fs" />
