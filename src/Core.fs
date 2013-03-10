@@ -272,19 +272,72 @@ and TxContext = {
   Connection: DbConnection
   Transaction: DbTransaction option }
 
+exception Abort of string
+
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module internal TxHelper =
+module Tx =
 
-  let inline run (Tx block) ctx state = 
-    block ctx state
+  /// Marks a transaction as rollback only
+  let rollbackOnly = Tx(fun _ _ -> Success (), { IsRollbackOnly = true })
 
-  let inline returnM x = Tx(fun ctx state -> Success x, state)
-  
+  /// Aborts a transaction
+  let inline abort e = Tx(fun _ state -> Failure e, state)
+
+  /// Aborts a transaction with a message
+  let inline abortwith message = abort <| Abort message
+
+  let inline internal runCore (Tx tx) ctx state = 
+    tx ctx state
+
+  let inline returnM m = Tx(fun ctx state -> Success m, state)
+
   let inline bindM m f = Tx(fun ctx state -> 
-    match run m ctx state with
-    | Success out, state -> run (f out) ctx state
+    match runCore m ctx state with
+    | Success out, state -> runCore (f out) ctx state
     | Failure exn, state -> Failure exn, state)
+
+  let inline applyM f m =
+    bindM f <| fun f' ->
+      bindM m <| fun m' ->
+        returnM (f' m') 
+
+  let inline liftM f m =
+    bindM m <| fun x -> returnM (f x)
+
+  let inline liftM2 f x y = applyM (applyM (returnM f) x) y
+
+  let inline private cons hd tl = hd :: tl
+    
+  let inline sequence s =
+    let inline cons a b = liftM2 (cons) a b
+    List.foldBack cons s (returnM [])
+
+  let inline mapM f x = sequence (List.map f x)
+
+  /// Ignores a transactional result
+  let inline ignore m = liftM ignore m
+
+  /// Runs a transaction workflow
+  let run (config: Config) (workflow: Tx<_>) =
+    let state = { IsRollbackOnly = false }
+    try
+      use con = config.ConnectionProvider()
+      let ctx = { 
+        Config = config
+        Connection = con
+        Transaction = None }
+      runCore workflow ctx state
+    with e -> 
+      Failure e, state
+
+  /// Runs a transaction workflow and gets a result
+  let eval config workflow = 
+    run config workflow |> fst
+
+  /// Runs a transaction workflow and gets a state
+  let exec config workflow = 
+    run config workflow |> snd
 
 type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
   let toAdoTx = function
@@ -293,17 +346,17 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
     | RepeatableRead -> System.Data.IsolationLevel.RepeatableRead
     | Serializable -> System.Data.IsolationLevel.Serializable
     | Snapshot -> System.Data.IsolationLevel.Snapshot
-  member this.Return(x) = TxHelper.returnM x
+  member this.Return(x) = Tx.returnM x
   member this.ReturnFrom(m) = m
-  member this.Bind(m, f) = TxHelper.bindM m f
+  member this.Bind(m, f) = Tx.bindM m f
   member this.Delay(f) = this.Bind(this.Return(), f)
   member this.Zero() = this.Return()
   member this.Combine(r1, r2) = this.Bind(r1, fun () -> r2)
   member this.TryWith(m, h) = Tx(fun ctx state ->
-    try TxHelper.run m ctx state
-    with e -> TxHelper.run (h e) ctx state)
+    try Tx.runCore m ctx state
+    with e -> Tx.runCore (h e) ctx state)
   member this.TryFinally(m, compensation) = Tx(fun ctx state ->
-    try TxHelper.run m ctx state
+    try Tx.runCore m ctx state
     finally compensation())
   member this.Using(res:#IDisposable, body) =
     this.TryFinally(body res, (fun () -> 
@@ -317,7 +370,7 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
       (fun enum -> this.While(enum.MoveNext, this.Delay(fun () -> body enum.Current))))
   member this.Run(f) = Tx(fun ({Config = config; Connection = con; Transaction = tx} as ctx) state ->
     let listener = config.Listener
-    let run ctx state = TxHelper.run f ctx state
+    let runCore ctx state = Tx.runCore f ctx state
     let begin_ (tx: DbTransaction) =
       config.Listener (TxBegin (tx.GetHashCode(), txAttr, txIsolatioinLevel))
     let commit (tx: DbTransaction) =
@@ -342,80 +395,27 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
         Failure exn, state 
     match txAttr, tx with
     | Required, Some _ -> 
-      run ctx state
+      runCore ctx state
     | Required, None
     | RequiresNew, None ->
       con.ConfirmOpen()
       use tx = con.BeginTransaction(toAdoTx txIsolatioinLevel)
       begin_ tx
-      let result, state = run {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
+      let result, state = runCore {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
       completeTx tx result state
     | RequiresNew, Some _ ->
       use con = config.ConnectionProvider()
       con.ConfirmOpen()
       use tx = con.BeginTransaction(toAdoTx txIsolatioinLevel)
       begin_ tx
-      let result, state = run {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
+      let result, state = runCore {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
       completeTx tx result state
     | Supports, _ ->
-      run ctx state
+      runCore ctx state
     | NotSupported, _ -> 
       use con = config.ConnectionProvider()
       con.ConfirmOpen()
-      run {ctx with Connection = con; Transaction = None } {IsRollbackOnly = false})
-
-exception Abort of string
-
-[<RequireQualifiedAccess>]
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Tx =
-
-  let abort e = Tx(fun _ state -> Failure e, state)
-
-  let abortwith message = abort <| Abort message
-
-  let rollbackOnly = Tx(fun _ _ -> Success (), { IsRollbackOnly = true })
-
-  let inline returnM m = TxHelper.returnM m
-
-  let inline applyM f m =
-    TxHelper.bindM f <| fun f' ->
-      TxHelper.bindM m <| fun m' ->
-        returnM (f' m') 
-
-  let inline liftM f m =
-    let ret x = returnM (f x)
-    TxHelper.bindM m ret
-
-  let inline liftM2 f x y = applyM (applyM (returnM f) x) y
-
-  let inline private cons hd tl = hd :: tl
-    
-  let inline sequence s =
-    let inline cons a b = liftM2 (cons) a b
-    List.foldBack cons s (returnM [])
-
-  let inline mapM f x = sequence (List.map f x)
-
-  let inline ignore m = liftM ignore m
-
-  let run (config: Config) (Tx(f)) =
-    let state = { IsRollbackOnly = false }
-    try
-      use con = config.ConnectionProvider()
-      let ctx = { 
-        Config = config
-        Connection = con
-        Transaction = None }
-      f ctx state
-    with e -> 
-      Failure e, state
-
-  let eval config f = 
-    run config f |> fst
-
-  let exec config f = 
-    run config f |> snd
+      runCore {ctx with Connection = con; Transaction = None } {IsRollbackOnly = false})
 
 [<AutoOpen>]
 module Directives =
@@ -433,8 +433,11 @@ module Directives =
 [<AutoOpen>]
 module Operators =
 
+  /// Makes a named parameter
   let inline (<--) (name:string) (value:'T) = Param(name, box value, typeof<'T>)
 
+  /// applyM
   let inline (<*>) f m = Tx.applyM f m
 
+  /// liftM
   let inline (<!>) f m = Tx.liftM f m
