@@ -45,7 +45,7 @@ module PaginateTest =
     Runner.rollbackOnly <| txSupports { 
       return! Db.paginate<Employee> "
         select * from Employee order by EmployeeId
-        " [] <| PaginateOpt(Offset = 1L, Limit = 2L) }
+        " [] <| Range(Offset = 1L, Limit = 2L) }
     |> function
     | Success ret -> 
       List.length ret |> isEqualTo 2
@@ -60,7 +60,7 @@ module PaginateTest =
     Runner.rollbackOnly <| txSupports { 
       return! Db.paginate<Employee> "
         select * from Employee order by EmployeeId
-        " [] <| PaginateOpt(Offset = 1L, Limit = 2L) }
+        " [] <| Range(Offset = 1L, Limit = 2L) }
     |> function
     | Success ret -> 
       List.length ret |> isEqualTo 2
@@ -75,7 +75,7 @@ module PaginateTest =
     Runner.rollbackOnly <| txSupports { 
       return! Db.paginate<Employee> "
          select * from Employee E order by /*#orderby*/
-        " ["orderby" <-- "E.EmployeeId"] <| PaginateOpt(Offset = 1L, Limit = 2L) }
+        " ["orderby" <-- "E.EmployeeId"] <| Range(Offset = 1L, Limit = 2L) }
     |> function
     | Success ret -> 
       List.length ret |> isEqualTo 2
@@ -90,7 +90,7 @@ module PaginateTest =
     Runner.rollbackOnly <| txSupports { 
       return! Db.paginate<Employee> "
          select * from Employee order by EmployeeId
-        " [] <| PaginateOpt(Offset = 0L, Limit = 2L) }
+        " [] <| Range(Offset = 0L, Limit = 2L) }
     |> function
     | Success ret -> 
       List.length ret |> isEqualTo 2
@@ -105,7 +105,7 @@ module PaginateTest =
     Runner.rollbackOnly <| txSupports { 
       return! Db.paginate<Employee> "
          select * from Employee order by EmployeeId
-        " [] <| PaginateOpt(Offset = -1L, Limit = 2L) }
+        " [] <| Range(Offset = -1L, Limit = 2L) }
     |> function
     | Success ret -> 
       List.length ret |> isEqualTo 2
@@ -120,7 +120,7 @@ module PaginateTest =
     Runner.rollbackOnly <| txSupports { 
       return! Db.paginate<Employee> "
          select * from Employee order by EmployeeId
-        " [] <| PaginateOpt(Offset = 1L, Limit = 1L) }
+        " [] <| Range(Offset = 1L, Limit = 1L) }
     |> function
     | Success ret -> 
       List.length ret |> isEqualTo 1
@@ -134,7 +134,7 @@ module PaginateTest =
     Runner.rollbackOnly <| txSupports { 
       return! Db.paginate<Employee> "
          select * from Employee order by EmployeeId
-        " [] <| PaginateOpt(Offset = 1L, Limit = 0L) }
+        " [] <| Range(Offset = 1L, Limit = 0L) }
     |> function
     | Success ret -> 
       List.length ret |> isEqualTo 0
@@ -146,7 +146,7 @@ module PaginateTest =
     Runner.rollbackOnly <| txSupports { 
       return! Db.paginate<Employee> "
          select * from Employee order by EmployeeId
-        " [] <| PaginateOpt(Offset = 1L, Limit = -1L) }
+        " [] <| Range(Offset = 1L, Limit = -1L) }
     |> function
     | Success ret -> 
       List.length ret |> isEqualTo 3
@@ -162,7 +162,7 @@ module PaginateTest =
     Runner.rollbackOnly <| txSupports { 
       return! Db.paginateAndCount<Employee> "
          select * from Employee order by EmployeeId
-        " [] <| PaginateOpt(Offset = 1L, Limit = 2L) }
+        " [] <| Range(Offset = 1L, Limit = 2L) }
     |> function
     | Success (list, count) -> 
       List.length list |> isEqualTo 2

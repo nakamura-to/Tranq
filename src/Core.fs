@@ -184,7 +184,7 @@ type IDialect =
   abstract MakeParamDisposer: command:DbCommand -> IDisposable
   abstract ParseSql: text:string -> SqlAst.Statement
 
-type PaginateOpt(?Offset: int64, ?Limit: int64) =
+type Range(?Offset: int64, ?Limit: int64) =
   member this.Offset = defaultArg Offset 0L
   member this.Limit = defaultArg Limit -1L
 

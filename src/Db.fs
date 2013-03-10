@@ -335,21 +335,30 @@ module internal Script =
       raise <| DbException(SR.TRANQ4028())
 
   let query<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters = 
-    let handler = getReaderHandler<'T> dialect
-    let stmt = Sql.prepare dialect sql parameters
-    Exec.executeReader<'T> ctx stmt handler
-
-  let paginate<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters opt = 
-    let handler = getReaderHandler<'T> dialect
-    let stmt = Sql.preparePaginate dialect sql parameters opt
-    Exec.executeReader<'T> ctx stmt handler
-
-  let paginateAndCount<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters opt = 
     let readerHandler = getReaderHandler<'T> dialect
-    let pagenageStmt, countStmt = Sql.preparePaginateAndCount dialect sql parameters opt
+    let stmt = Sql.prepare dialect sql parameters
+    Exec.executeReader<'T> ctx stmt readerHandler
+
+  let paginate<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters range = 
+    let readerHandler = getReaderHandler<'T> dialect
+    let stmt = Sql.preparePaginate dialect sql parameters range
+    Exec.executeReader<'T> ctx stmt readerHandler
+
+  let paginateAndCount<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters range = 
+    let readerHandler = getReaderHandler<'T> dialect
+    let pagenageStmt, countStmt = Sql.preparePaginateAndCount dialect sql parameters range
     let rows = Exec.executeReader<'T> ctx pagenageStmt readerHandler
     let count = Exec.executeScalar ctx countStmt
     rows, Convert.ChangeType(count, typeof<int64>) :?> int64
+
+  let iterate<'T> ({Config = {Dialect = dialect}} as ctx) sql parameters range handler = 
+    let readerHandler = getReaderHandler<'T> dialect
+    let stmt = Sql.preparePaginate dialect sql parameters range
+    let source = ExecDifferred.executeReader<'T> ctx stmt readerHandler
+    use ie = source.GetEnumerator()
+    let next = ref true
+    while !next && ie.MoveNext() do
+      next := handler ie.Current
 
   let execute ({Config = {Dialect = dialect}} as ctx) sql parameters  = 
     let stmt = Sql.prepare dialect sql parameters
@@ -619,16 +628,25 @@ module Db =
     let ret = Script.query<'T> ctx sql parameters
     Success ret, state)
 
-  let paginate<'T> sql parameters opt = Tx(fun ctx state -> 
-    Guard.argNotNull (sql, "sql")
-    Guard.argNotNull (parameters, "parameters") 
-    let ret = Script.paginate<'T> ctx sql parameters opt
-    Success ret, state)
-
-  let paginateAndCount<'T> sql parameters opt = Tx(fun ctx state -> 
+  let paginate<'T> sql parameters range = Tx(fun ctx state -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
-    let ret = Script.paginateAndCount<'T> ctx sql parameters opt
+    Guard.argNotNull (range, "range")
+    let ret = Script.paginate<'T> ctx sql parameters range
+    Success ret, state)
+
+  let paginateAndCount<'T> sql parameters range = Tx(fun ctx state -> 
+    Guard.argNotNull (sql, "sql")
+    Guard.argNotNull (parameters, "parameters")
+    Guard.argNotNull (range, "range")
+    let ret = Script.paginateAndCount<'T> ctx sql parameters range
+    Success ret, state)
+
+  let iterate<'T> sql parameters range handler = Tx(fun ctx state -> 
+    Guard.argNotNull (sql, "sql")
+    Guard.argNotNull (parameters, "parameters")
+    Guard.argNotNull (range, "range")
+    let ret = Script.iterate<'T> ctx sql parameters range handler
     Success ret, state)
 
   let execute sql parameters = Tx(fun ctx state -> 

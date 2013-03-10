@@ -55,6 +55,7 @@
   <ItemGroup>
     <Compile Include="Util.fs" />
     <Compile Include="PaginateTest.fs" />
+    <Compile Include="Iterate.fs" />
     <Compile Include="ExecuteTest.fs" />
     <Compile Include="FindTest.fs" />
     <Compile Include="InsertTest.fs" />
