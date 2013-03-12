@@ -68,12 +68,10 @@ let workflow2 = txRequired {
   return p1 @ [p2] }
 
 let config = 
-  let dataConvReg =
-    let reg = DataConvRegistry()
-    reg.Add(Email.conv)
-    reg.Add(Age.conv)
-    reg.Add(Version.conv)
-    reg
+  let registry = DataConvRegistry()
+  registry.Add(Email.conv)
+  registry.Add(Age.conv)
+  registry.Add(Version.conv)
   let connectionString = "Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;" 
   let log = printfn "LOG: %s"
   let listener = function
@@ -83,7 +81,7 @@ let config =
     | Sql(txId, stmt) -> 
       let txId = match txId with Some v -> string v | _ -> ""
       log (sprintf "txId=%s, sql=[%s]" txId stmt.FormattedText)
-  { Dialect = MsSqlDialect(dataConvReg)
+  { Dialect = MsSqlDialect(registry)
     ConnectionProvider = fun () -> new SqlConnection(connectionString) :> DbConnection
     Listener = listener }
 
