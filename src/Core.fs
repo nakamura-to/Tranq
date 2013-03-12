@@ -364,7 +364,8 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
       | null -> () 
       | disp -> disp.Dispose()))
   member this.While(guard, m) =
-    this.Bind(m, (fun () -> this.While(guard, m)))
+    if not (guard()) then this.Zero() 
+    else this.Bind(m, (fun _ -> this.While(guard, m)))
   member this.For(sequence:seq<_>, body) =
     this.Using(sequence.GetEnumerator(),
       (fun enum -> this.While(enum.MoveNext, this.Delay(fun () -> body enum.Current))))
