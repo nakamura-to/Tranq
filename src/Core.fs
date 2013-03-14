@@ -252,7 +252,7 @@ type TxState = { IsRollbackOnly: bool }
 
 type Tx<'R> = Tx of (TxContext -> TxState -> TxResult<'R> * TxState)
  
-and TxAttr = Required | RequiresNew | Supports | NotSupported
+and TxAttr = Required | RequiresNew | Suppress
 
 and TxIsolationLevel = ReadUncommitted | ReadCommitted | RepeatableRead | Serializable | Snapshot
 
@@ -411,9 +411,7 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
       begin_ tx
       let result, state = runCore {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
       completeTx tx result state
-    | Supports, _ ->
-      runCore ctx state
-    | NotSupported, _ -> 
+    | Suppress, _ -> 
       use con = config.ConnectionProvider()
       con.ConfirmOpen()
       runCore {ctx with Connection = con; Transaction = None } {IsRollbackOnly = false})
@@ -427,9 +425,7 @@ module Directives =
 
   let txRequiresNew = TxBuilder(TxAttr.RequiresNew, TxIsolationLevel.ReadCommitted)
 
-  let txSupports = TxBuilder(TxAttr.Supports, TxIsolationLevel.ReadCommitted)
-
-  let txNotSupported = TxBuilder(TxAttr.NotSupported, TxIsolationLevel.ReadCommitted)
+  let txSuppress = TxBuilder(TxAttr.Suppress, TxIsolationLevel.ReadCommitted)
 
 [<AutoOpen>]
 module Operators =

@@ -25,47 +25,67 @@ module Version =
     member this.Compose(value) = make value
     member this.Decompose(Version(value)) = value }
 
+type Person = { 
+  [<Id>]
+  Id: int
+  Name: string
+  Email: Email.t
+  Age: Age.t
+  [<Version>]
+  Version: Version.t }
+
+[<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Person =
-  [<Table(Name = "Person")>]
-  type t = { [<Id>]Id: int; Name: string; Email: Email.t; Age: Age.t; [<Version>]Version: Version.t }
   let incrAge person = { person with Age = Age.incr person.Age }
 
 module PersonDao =
-  type t = Person.t
+  type t = Person
+  let all () = Db.query<t> "select * from Person" []
+  let byEmail (email: Email.t) = Db.query<t> "select * from Person where Email = @Email" ["@Email" <-- email]
+  let byId (id: int) = Db.find<t> [id]
+  let insert person = Db.insert<t> person
+  let update person = Db.update<t> person
+  let delete person = Db.delete<t> person
 
-  let setup = txSupports { 
-    do! Db.run "
-        if exists (select * from dbo.sysobjects where id = object_id(N'Person')) drop table Person;
-        create table Person (Id int primary key, Name varchar(20), Email varchar(50), Age int, Version int);
-        " []
-    do! Db.insert<t> { Id = 1; Name = "hoge"; Email = Email.make "hoge@example.com"; Age = Age.make <| Some 10; Version = Version.make -1 } |> Tx.ignore
-    do! Db.insert<t> { Id = 2; Name = "foo"; Email = Email.make "foo_example.com"; Age = Age.make None; Version = Version.make -1 } |> Tx.ignore
-    do! Db.insert<t> { Id = 3; Name = "bar"; Email = Email.make "bar@example.com"; Age = Age.make <| Some 20; Version = Version.make -1 } |> Tx.ignore }
+let incrAge person = { person with Age = Age.incr person.Age }
 
-  let queryAll () = txSupports {
-    return! Db.query<t> "select * from Person" [] }
-
-  let queryByEmail email = txSupports {
-    return! Db.query<t> "select * from Person where Name = @name" ["@name" <-- (email: Email.t)] }
-
-  let find (id: int) = txSupports {
-    return! Db.find<t> [id] }
-
-  let update person = txSupports {
-    return! Db.update<t> person }
+// init databases
+let init = 
+  Db.run "
+  if exists (select * from dbo.sysobjects where id = object_id(N'Person')) drop table Person;
+  create table Person (Id int primary key, Name varchar(20), Email varchar(50), Age int, Version int);
+  insert Person (Id, Name, Email, Age, Version) values (1, 'hoge', 'hoge@example.com', 10, 0);
+  insert Person (Id, Name, Email, Age, Version) values (2, 'foo', 'foo_example.com', null, 0);
+  insert Person (Id, Name, Email, Age, Version) values (3, 'bar', 'bar@example.com', 30, 0);
+  " []
 
 /// query, increment age and then update
 let workflow1 = txRequired {
-  do! PersonDao.setup
-  let! persons = PersonDao.queryAll()
-  return! persons |> List.map Person.incrAge |> Tx.mapM PersonDao.update }
+  do! init
+  let! persons = PersonDao.all()
+  return! persons 
+    |> List.map Person.incrAge 
+    |> Tx.mapM PersonDao.update }
 
 // query by name and query by identifier
 let workflow2 = txRequired {
-  do! PersonDao.setup
-  let! p1 = PersonDao.queryByEmail <| Email.make "hoge@example.com"
-  let! p2 = PersonDao.find 2
+  do! init
+  let email = Email.make "hoge@example.com"
+  let! p1 = PersonDao.byEmail email
+  let! p2 = PersonDao.byId 2
   return p1 @ [p2] }
+
+// insert and delete
+let workflow3 = txRequired {
+  do! init
+  let! person = PersonDao.insert {
+    Id = 99
+    Name = "fuga"
+    Email = Email.make "fuga@example.com"
+    Age = Age.make (Some 20)
+    Version = Version.make 0 }
+  do! PersonDao.delete person }
 
 let config = 
   let registry = DataConvRegistry()
@@ -96,4 +116,6 @@ let main argv =
   eval workflow1
   printfn "------------- workflow2 -------------"
   eval workflow2
+  printfn "------------- workflow3 -------------"
+  eval workflow3
   System.Console.ReadKey() |> fun _ -> 0
