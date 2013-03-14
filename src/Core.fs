@@ -415,17 +415,18 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
       use con = config.ConnectionProvider()
       con.ConfirmOpen()
       runCore {ctx with Connection = con; Transaction = None } {IsRollbackOnly = false})
+  member this.With(newTxIsolatioinLevel) = TxBuilder(txAttr, newTxIsolatioinLevel)
 
 [<AutoOpen>]
 module Directives =
 
-  let tx(attr, level) = TxBuilder(attr, level)
+  let internal defaultIsolationLevel = TxIsolationLevel.ReadCommitted
 
-  let txRequired = TxBuilder(TxAttr.Required, TxIsolationLevel.ReadCommitted)
+  let txRequired = TxBuilder(TxAttr.Required, defaultIsolationLevel)
 
-  let txRequiresNew = TxBuilder(TxAttr.RequiresNew, TxIsolationLevel.ReadCommitted)
+  let txRequiresNew = TxBuilder(TxAttr.RequiresNew, defaultIsolationLevel)
 
-  let txSuppress = TxBuilder(TxAttr.Suppress, TxIsolationLevel.ReadCommitted)
+  let txSuppress = TxBuilder(TxAttr.Suppress, defaultIsolationLevel)
 
 [<AutoOpen>]
 module Operators =

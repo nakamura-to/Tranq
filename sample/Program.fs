@@ -28,7 +28,6 @@ module Version =
 type Person = { 
   [<Id>]
   Id: int
-  Name: string
   Email: Email.t
   Age: Age.t
   [<Version>]
@@ -48,16 +47,14 @@ module PersonDao =
   let update person = Db.update<t> person
   let delete person = Db.delete<t> person
 
-let incrAge person = { person with Age = Age.incr person.Age }
-
 // init databases
 let init = 
   Db.run "
   if exists (select * from dbo.sysobjects where id = object_id(N'Person')) drop table Person;
-  create table Person (Id int primary key, Name varchar(20), Email varchar(50), Age int, Version int);
-  insert Person (Id, Name, Email, Age, Version) values (1, 'hoge', 'hoge@example.com', 10, 0);
-  insert Person (Id, Name, Email, Age, Version) values (2, 'foo', 'foo_example.com', null, 0);
-  insert Person (Id, Name, Email, Age, Version) values (3, 'bar', 'bar@example.com', 30, 0);
+  create table Person (Id int primary key, Email varchar(50), Age int, Version int);
+  insert Person (Id, Email, Age, Version) values (1, 'hoge@example.com', 10, 0);
+  insert Person (Id, Email, Age, Version) values (2, 'foo_example.com', null, 0);
+  insert Person (Id, Email, Age, Version) values (3, 'bar@example.com', 30, 0);
   " []
 
 /// query, increment age and then update
@@ -69,7 +66,7 @@ let workflow1 = txRequired {
     |> Tx.mapM PersonDao.update }
 
 // query by name and query by identifier
-let workflow2 = txRequired {
+let workflow2 = txRequired.With(TxIsolationLevel.ReadUncommitted) {
   do! init
   let email = Email.make "hoge@example.com"
   let! p1 = PersonDao.byEmail email
@@ -81,7 +78,6 @@ let workflow3 = txRequired {
   do! init
   let! person = PersonDao.insert {
     Id = 99
-    Name = "fuga"
     Email = Email.make "fuga@example.com"
     Age = Age.make (Some 20)
     Version = Version.make 0 }
