@@ -51,6 +51,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.fs" />
+    <None Include="01-basic.fsx" />
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
