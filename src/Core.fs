@@ -250,25 +250,25 @@ type TxResult<'R> = Success of 'R | Failure of exn
 
 type TxState = { IsRollbackOnly: bool }
 
+type TxAttr = Required | RequiresNew | Suppress
+
+type TxIsolationLevel = ReadUncommitted | ReadCommitted | RepeatableRead | Serializable | Snapshot
+
+type TxEvent = 
+  | TxBegun of int * TxAttr * TxIsolationLevel
+  | TxCommitted of int * TxAttr * TxIsolationLevel
+  | TxRolledback of int * TxAttr * TxIsolationLevel
+  | SqlIssuing of int option * PreparedStatement
+
 type Tx<'R> = Tx of (TxContext -> TxState -> TxResult<'R> * TxState)
  
-and TxAttr = Required | RequiresNew | Suppress
-
-and TxIsolationLevel = ReadUncommitted | ReadCommitted | RepeatableRead | Serializable | Snapshot
-
-and Event = 
-  | TxBegin of int * TxAttr * TxIsolationLevel
-  | TxCommit of int * TxAttr * TxIsolationLevel
-  | TxRollback of int * TxAttr * TxIsolationLevel
-  | Sql of int option * PreparedStatement
-
-and Config = {
+and TxConfig = {
   Dialect: IDialect
   ConnectionProvider: unit -> DbConnection
-  Listener: Event -> unit }
+  Listener: TxEvent -> unit }
 
 and TxContext = { 
-  Config: Config
+  Config: TxConfig
   Connection: DbConnection
   Transaction: DbTransaction option }
 
@@ -319,7 +319,7 @@ module Tx =
   let inline ignore m = liftM ignore m
 
   /// Runs a transaction workflow
-  let run (config: Config) (workflow: Tx<_>) =
+  let run config workflow =
     let state = { IsRollbackOnly = false }
     try
       use con = config.ConnectionProvider()
@@ -373,13 +373,13 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
     let listener = config.Listener
     let runCore ctx state = Tx.runCore f ctx state
     let begin_ (tx: DbTransaction) =
-      config.Listener (TxBegin (tx.GetHashCode(), txAttr, txIsolatioinLevel))
+      config.Listener (TxBegun (tx.GetHashCode(), txAttr, txIsolatioinLevel))
     let commit (tx: DbTransaction) =
       tx.Commit()
-      config.Listener (TxCommit (tx.GetHashCode(), txAttr, txIsolatioinLevel))
+      config.Listener (TxCommitted (tx.GetHashCode(), txAttr, txIsolatioinLevel))
     let rollback (tx: DbTransaction) = 
       tx.Rollback()
-      config.Listener (TxRollback (tx.GetHashCode(), txAttr, txIsolatioinLevel))
+      config.Listener (TxRolledback (tx.GetHashCode(), txAttr, txIsolatioinLevel))
     let completeTx tx result (state: TxState) =
       match result with
       | Success value -> 

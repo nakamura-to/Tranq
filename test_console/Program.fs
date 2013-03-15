@@ -91,10 +91,10 @@ let config =
   let connectionString = "Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;" 
   let log = printfn "LOG: %s"
   let listener = function
-    | TxBegin(txId, _, _)-> log (sprintf "txId=%d, tx begin" txId)
-    | TxCommit(txId, _, _)-> log (sprintf "txId=%d, tx commit" txId)
-    | TxRollback(txId, _, _)-> log (sprintf "txId=%d, tx rollback" txId)
-    | Sql(txId, stmt) -> 
+    | TxBegun(txId, _, _)-> log (sprintf "txId=%d, tx begin" txId)
+    | TxCommitted(txId, _, _)-> log (sprintf "txId=%d, tx commit" txId)
+    | TxRolledback(txId, _, _)-> log (sprintf "txId=%d, tx rollback" txId)
+    | SqlIssuing(txId, stmt) -> 
       let txId = match txId with Some v -> string v | _ -> ""
       log (sprintf "txId=%s, sql=[%s]" txId stmt.FormattedText)
   { Dialect = MsSqlDialect(registry)

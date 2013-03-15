@@ -12,8 +12,8 @@ let config =
     let conStr = "Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;" 
     new System.Data.SqlClient.SqlConnection(conStr) :> System.Data.Common.DbConnection
   let log = function
-    | Sql(_, stmt) -> printfn "LOG: %s" stmt.FormattedText
-    |_ -> ()  
+    | SqlIssuing(_, stmt) -> printfn "LOG: %s" stmt.FormattedText
+    |_ -> ()
   { Dialect = MsSqlDialect(); ConnectionProvider =provide; Listener = log }
 
 // transaction workflow

@@ -258,7 +258,7 @@ module internal Exec =
     use command = con.CreateCommand()
     use paramsDisposer = DbHelper.setupCommand ctx stmt command
     let txId = Option.map (fun tx -> tx.GetHashCode()) tx
-    listener (Sql (txId, stmt))
+    listener (SqlIssuing (txId, stmt))
     try
       commandHandler command
     with ex -> 
@@ -312,7 +312,7 @@ module internal ExecDifferred =
       use command = con.CreateCommand()
       use paramsDisposer = DbHelper.setupCommand ctx stmt command
       let txId = Option.map (fun tx -> tx.GetHashCode()) tx
-      listener (Sql (txId, stmt))
+      listener (SqlIssuing (txId, stmt))
       yield! commandHandler command }
 
   let executeReader<'T> ({Config = {Dialect = dialect}} as ctx) stmt (readerHandler: DbDataReader -> 'T seq) = 
