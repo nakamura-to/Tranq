@@ -1,5 +1,5 @@
-﻿#r @"bin\Debug\FSharp.PowerPack.dll"
-#r @"bin\Debug\Tranq.dll"
+﻿#r @"lib\FSharp.PowerPack.dll"
+#r @"lib\Tranq.dll"
 
 open Tranq
 
