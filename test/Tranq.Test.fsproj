@@ -57,6 +57,7 @@
     <Compile Include="MetaTest.fs" />
     <Compile Include="SqlTest.fs" />
     <Compile Include="DbTest.fs" />
+    <Compile Include="TxTest.fs" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

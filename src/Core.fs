@@ -250,7 +250,7 @@ type TxResult<'R> = Success of 'R | Failure of exn
 
 type TxState = { IsRollbackOnly: bool }
 
-type TxAttr = Required | RequiresNew | Suppress
+type TxAttr = Required | RequiresNew | Supports | NotSupported
 
 type TxIsolationLevel = ReadUncommitted | ReadCommitted | RepeatableRead | Serializable | Snapshot
 
@@ -260,7 +260,7 @@ type TxEvent =
   | TxRolledback of int * TxAttr * TxIsolationLevel
   | SqlIssuing of int option * PreparedStatement
 
-type Tx<'R> = Tx of (TxContext -> TxState -> TxResult<'R> * TxState)
+type Tx<'R> = Tx of (TxContext -> TxResult<'R> * TxState)
  
 and TxConfig = {
   Dialect: IDialect
@@ -270,7 +270,8 @@ and TxConfig = {
 and TxContext = { 
   Config: TxConfig
   Connection: DbConnection
-  Transaction: DbTransaction option }
+  Transaction: DbTransaction option
+  State: TxState }
 
 exception Abort of string
 
@@ -279,22 +280,28 @@ exception Abort of string
 module Tx =
 
   /// Marks a transaction as rollback only
-  let rollbackOnly = Tx(fun _ _ -> Success (), { IsRollbackOnly = true })
+  let rollbackOnly = Tx(fun _ -> Success (), { IsRollbackOnly = true })
+
+  /// Gets whether a transaction is marked as rollback only or not
+  let isRollbackOnly = Tx(fun {State = state} -> Success state.IsRollbackOnly, state)
 
   /// Aborts a transaction
-  let inline abort e = Tx(fun _ state -> Failure e, state)
+  let inline abort e = Tx(fun {State = state} -> Failure e, state)
 
   /// Aborts a transaction with a message
   let inline abortwith message = abort <| Abort message
 
-  let inline internal runCore (Tx tx) ctx state = 
-    tx ctx state
+  /// Aborts a transaction with a format
+  let inline abortwithf fmt  = Printf.ksprintf abortwith fmt
 
-  let inline returnM m = Tx(fun ctx state -> Success m, state)
+  let inline internal runCore (Tx tx) ctx = 
+    tx ctx
 
-  let inline bindM m f = Tx(fun ctx state -> 
-    match runCore m ctx state with
-    | Success out, state -> runCore (f out) ctx state
+  let inline returnM m = Tx(fun {State = state} -> Success m, state)
+
+  let inline bindM m f = Tx(fun ctx -> 
+    match runCore m ctx with
+    | Success out, state -> runCore (f out) {ctx with State = state}
     | Failure exn, state -> Failure exn, state)
 
   let inline applyM f m =
@@ -326,8 +333,9 @@ module Tx =
       let ctx = { 
         Config = config
         Connection = con
-        Transaction = None }
-      runCore workflow ctx state
+        Transaction = None
+        State = state }
+      runCore workflow ctx
     with e -> 
       Failure e, state
 
@@ -352,11 +360,11 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
   member this.Delay(f) = this.Bind(this.Return(), f)
   member this.Zero() = this.Return()
   member this.Combine(r1, r2) = this.Bind(r1, fun () -> r2)
-  member this.TryWith(m, h) = Tx(fun ctx state ->
-    try Tx.runCore m ctx state
-    with e -> Tx.runCore (h e) ctx state)
-  member this.TryFinally(m, compensation) = Tx(fun ctx state ->
-    try Tx.runCore m ctx state
+  member this.TryWith(m, h) = Tx(fun ctx ->
+    try Tx.runCore m ctx
+    with e -> Tx.runCore (h e) ctx)
+  member this.TryFinally(m, compensation) = Tx(fun ctx ->
+    try Tx.runCore m ctx
     finally compensation())
   member this.Using(res:#IDisposable, body) =
     this.TryFinally(body res, (fun () -> 
@@ -369,9 +377,9 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
   member this.For(sequence:seq<_>, body) =
     this.Using(sequence.GetEnumerator(),
       (fun enum -> this.While(enum.MoveNext, this.Delay(fun () -> body enum.Current))))
-  member this.Run(f) = Tx(fun ({Config = config; Connection = con; Transaction = tx} as ctx) state ->
+  member this.Run(f) = Tx(fun ({Config = config; Connection = con; Transaction = tx; State = state} as ctx) ->
     let listener = config.Listener
-    let runCore ctx state = Tx.runCore f ctx state
+    let runCore ctx = Tx.runCore f ctx
     let begin_ (tx: DbTransaction) =
       config.Listener (TxBegun (tx.GetHashCode(), txAttr, txIsolatioinLevel))
     let commit (tx: DbTransaction) =
@@ -380,7 +388,7 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
     let rollback (tx: DbTransaction) = 
       tx.Rollback()
       config.Listener (TxRolledback (tx.GetHashCode(), txAttr, txIsolatioinLevel))
-    let completeTx tx result (state: TxState) =
+    let completeTx tx (result, state) =
       match result with
       | Success value -> 
         try
@@ -395,26 +403,27 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
         try rollback tx with e -> ()
         Failure exn, state 
     match txAttr, tx with
-    | Required, Some _ -> 
-      runCore ctx state
+    | Required, Some _
+    | Supports, _ ->
+      runCore ctx
     | Required, None
     | RequiresNew, None ->
       con.ConfirmOpen()
       use tx = con.BeginTransaction(toAdoTx txIsolatioinLevel)
       begin_ tx
-      let result, state = runCore {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
-      completeTx tx result state
+      runCore {ctx with Connection = con; Transaction = Some tx; State = {IsRollbackOnly = false}}
+      |> completeTx tx
     | RequiresNew, Some _ ->
       use con = config.ConnectionProvider()
       con.ConfirmOpen()
       use tx = con.BeginTransaction(toAdoTx txIsolatioinLevel)
       begin_ tx
-      let result, state = runCore {ctx with Connection = con; Transaction = Some tx } {IsRollbackOnly = false}
-      completeTx tx result state
-    | Suppress, _ -> 
+      runCore {ctx with Connection = con; Transaction = Some tx; State = {IsRollbackOnly = false}}
+      |> completeTx tx
+    | NotSupported, _ -> 
       use con = config.ConnectionProvider()
       con.ConfirmOpen()
-      runCore {ctx with Connection = con; Transaction = None } {IsRollbackOnly = false})
+      runCore {ctx with Connection = con; Transaction = None; State = {IsRollbackOnly = false}})
   member this.With(newTxIsolatioinLevel) = TxBuilder(txAttr, newTxIsolatioinLevel)
 
 [<AutoOpen>]
@@ -426,7 +435,9 @@ module Directives =
 
   let txRequiresNew = TxBuilder(TxAttr.RequiresNew, defaultIsolationLevel)
 
-  let txSuppress = TxBuilder(TxAttr.Suppress, defaultIsolationLevel)
+  let txSupports = TxBuilder(TxAttr.Supports, defaultIsolationLevel)
+
+  let txNotSupported = TxBuilder(TxAttr.NotSupported, defaultIsolationLevel)
 
 [<AutoOpen>]
 module Operators =

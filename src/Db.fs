@@ -630,151 +630,151 @@ module internal Auto =
 module Db =
 
   /// <summary>Queries rows.</summary>
-  let query<'T> sql parameters = Tx(fun ctx state -> 
+  let query<'T> sql parameters = Tx(fun ctx -> 
     Guard.argNotNull (sql, "sql") 
     Guard.argNotNull (parameters, "parameters")
     let ret = Script.query<'T> ctx sql parameters
-    Success ret, state)
+    Success ret, ctx.State)
 
   /// <summary>Paginates rows.</summary>
-  let paginate<'T> sql parameters range = Tx(fun ctx state -> 
+  let paginate<'T> sql parameters range = Tx(fun ctx -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
     Guard.argNotNull (range, "range")
     let ret = Script.paginate<'T> ctx sql parameters range
-    Success ret, state)
+    Success ret, ctx.State)
 
   /// <summary>Paginates rows and counts rows without a range condition.</summary>
-  let paginateAndCount<'T> sql parameters range = Tx(fun ctx state -> 
+  let paginateAndCount<'T> sql parameters range = Tx(fun ctx -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
     Guard.argNotNull (range, "range")
     let ret = Script.paginateAndCount<'T> ctx sql parameters range
-    Success ret, state)
+    Success ret, ctx.State)
 
   /// <summary>Iterates rows with an internal iterator.</summary>
-  let iterate<'T> sql parameters range handler = Tx(fun ctx state -> 
+  let iterate<'T> sql parameters range handler = Tx(fun ctx -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
     Guard.argNotNull (range, "range")
     let ret = Script.iterate<'T> ctx sql parameters range handler
-    Success ret, state)
+    Success ret, ctx.State)
 
   /// <summary>Executes an arbitrary SQL.</summary>
-  let execute sql parameters = Tx(fun ctx state -> 
+  let execute sql parameters = Tx(fun ctx -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
     let ret = Script.execute ctx sql parameters 
-    Success ret, state)
+    Success ret, ctx.State)
 
   /// <summary>executes an arbitrary SQL and discards the result.</summary>
-  let run sql parameters = Tx(fun ctx state -> 
+  let run sql parameters = Tx(fun ctx -> 
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
     Script.execute ctx sql parameters |> ignore
-    Success (), state)
+    Success (), ctx.State)
 
   /// <summary>Executes and handle a DbDataReader object.</summary>
-  let executeReader<'T> sql parameters readerHandler = Tx(fun ctx state ->
+  let executeReader<'T> sql parameters readerHandler = Tx(fun ctx ->
     Guard.argNotNull (sql, "sql")
     Guard.argNotNull (parameters, "parameters")
     Guard.argNotNull (readerHandler, "readerHandler")
     let ret = Script.executeReader<'T> ctx sql parameters readerHandler
-    Success ret, state)
+    Success ret, ctx.State)
 
   /// <summary>Finds an entity by identifier.</summary>
   /// <exception cref="Tranq.EntityNotFoundError">Thrown when an entity is not found.</exception>
-  let find<'T when 'T : not struct> id = Tx(fun ctx state -> 
+  let find<'T when 'T : not struct> id = Tx(fun ctx -> 
     Guard.argNotNull (id, "id")
     match Auto.tryFind<'T> ctx id with
     | Auto.Found value ->
-      Success value, state
+      Success value, ctx.State
     | Auto.NotFound stmt ->
       raise <| EntityNotFoundError stmt)
 
   /// <summary>Trys to find an entity by identifier.</summary>
-  let tryFind<'T when 'T : not struct> id = Tx(fun ctx state -> 
+  let tryFind<'T when 'T : not struct> id = Tx(fun ctx -> 
     Guard.argNotNull (id, "id")
     match Auto.tryFind<'T> ctx id with
     | Auto.Found value -> 
-      Success (Some value), state
+      Success (Some value), ctx.State
     | Auto.NotFound _ -> 
-      Success None, state)
+      Success None, ctx.State)
 
   /// <summary>Finds an entity by identifier and version.</summary>
   /// <exception cref="Tranq.EntityNotFoundError">Thrown when an entity is not found.</exception>
   /// <exception cref="Tranq.OptimisticLockError">Thrown when an optimistic lock error is detected.</exception>
-  let findWithVersion<'T when 'T : not struct> id version = Tx(fun ctx state -> 
+  let findWithVersion<'T when 'T : not struct> id version = Tx(fun ctx -> 
     Guard.argNotNull (id, "id")
     match Auto.tryFindWithVersion<'T> ctx id version with
     | Auto.VersionFound value -> 
-      Success value, state
+      Success value, ctx.State
     | Auto.VersionNotFound stmt ->
       raise <| EntityNotFoundError stmt
     | Auto.VersionConflicted stmt ->
       raise <| OptimisticLockError stmt)
 
   /// <summary>Trys to find an entity by identifier and version.</summary>
-  let tryFindWithVersion<'T when 'T : not struct> id version = Tx(fun ctx state -> 
+  let tryFindWithVersion<'T when 'T : not struct> id version = Tx(fun ctx -> 
     Guard.argNotNull (id, "id")
     match Auto.tryFindWithVersion<'T> ctx id version with
     | Auto.VersionFound value -> 
-      Success (Some value), state
+      Success (Some value), ctx.State
     | Auto.VersionNotFound _ 
     | Auto.VersionConflicted _-> 
-      Success None, state)
+      Success None, ctx.State)
 
   /// <summary>Inserts an entity.</summary>
   /// <exception cref="Tranq.UniqueConstraintError">Thrown when an unique constraint violation is detected.</exception>
-  let insert<'T when 'T : not struct> (entity: 'T) = Tx(fun ctx state -> 
+  let insert<'T when 'T : not struct> (entity: 'T) = Tx(fun ctx -> 
     Guard.argNotNull (entity, "entity")
     let ret = Auto.insert ctx entity (InsertOpt())
-    Success ret, state)
+    Success ret, ctx.State)
 
   /// <summary>Inserts an entity with option.</summary>
   /// <exception cref="Tranq.UniqueConstraintError">Thrown when an unique constraint violation is detected.</exception>
-  let insertWithOpt<'T when 'T : not struct> (entity: 'T) opt = Tx(fun ctx state -> 
+  let insertWithOpt<'T when 'T : not struct> (entity: 'T) opt = Tx(fun ctx -> 
     Guard.argNotNull (entity, "entity")
     Guard.argNotNull (opt, "opt") 
     let ret = Auto.insert ctx entity opt
-    Success ret, state)
+    Success ret, ctx.State)
 
   /// <summary>Updates an entity.</summary>
   /// <exception cref="Tranq.UniqueConstraintError">Thrown when an unique constraint violation is detected.</exception>
   /// <exception cref="Tranq.OptimisticLockError">Thrown when an optimistic lock error is detected.</exception>
-  let update<'T when 'T : not struct> (entity: 'T) = Tx(fun ctx state -> 
+  let update<'T when 'T : not struct> (entity: 'T) = Tx(fun ctx -> 
     Guard.argNotNull (entity, "entity")
     let ret = Auto.update ctx entity (UpdateOpt())
-    Success ret, state)
+    Success ret, ctx.State)
 
   /// <summary>Updates an entity with option.</summary>
   /// <exception cref="Tranq.UniqueConstraintError">Thrown when an unique constraint violation is detected.</exception>
   /// <exception cref="Tranq.OptimisticLockError">Thrown when an optimistic lock error is detected.</exception>
-  let updateWithOpt<'T when 'T : not struct> (entity: 'T) opt = Tx(fun ctx state -> 
+  let updateWithOpt<'T when 'T : not struct> (entity: 'T) opt = Tx(fun ctx -> 
     Guard.argNotNull (entity, "entity")
     Guard.argNotNull (opt, "opt") 
     let ret = Auto.update ctx entity opt
-    Success ret, state)
+    Success ret, ctx.State)
 
   /// <summary>Deletes an entity.</summary>
   /// <exception cref="Tranq.OptimisticLockError">Thrown when an optimistic lock error is detected.</exception>
-  let delete<'T when 'T : not struct> (entity: 'T) = Tx(fun ctx state -> 
+  let delete<'T when 'T : not struct> (entity: 'T) = Tx(fun ctx -> 
     Guard.argNotNull (entity, "entity")
     let ret = Auto.delete ctx entity (DeleteOpt())
-    Success ret, state)
+    Success ret, ctx.State)
 
   /// <summary>Deletes an entity with option.</summary>
   /// <exception cref="Tranq.OptimisticLockError">Thrown when an optimistic lock error is detected.</exception>
-  let deleteWithOpt<'T when 'T : not struct> (entity: 'T) opt = Tx(fun ctx state -> 
+  let deleteWithOpt<'T when 'T : not struct> (entity: 'T) opt = Tx(fun ctx -> 
     Guard.argNotNull (entity, "entity")
     Guard.argNotNull (opt, "opt") 
     let ret = Auto.delete ctx entity opt
-    Success ret, state)
+    Success ret, ctx.State)
 
   /// <summary>Calls a stored procedure or a stored function.</summary>
   /// <exception cref="Tranq.UniqueConstraintError">Thrown when an unique constraint violation is detected.</exception>
-  let call<'T when 'T : not struct> (procedure: 'T) = Tx(fun ctx state -> 
+  let call<'T when 'T : not struct> (procedure: 'T) = Tx(fun ctx -> 
     Guard.argNotNull (procedure, "procedure")
     let ret = Auto.call ctx procedure
-    Success ret, state)
+    Success ret, ctx.State)
 
