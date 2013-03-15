@@ -42,7 +42,7 @@ module PaginateTest =
 
   [<Test>]
   let ``paginate``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.paginate<Employee> "
         select * from Employee order by EmployeeId
         " [] <| Range(Offset = 1L, Limit = 2L) }
@@ -57,7 +57,7 @@ module PaginateTest =
 
   [<Test>]
   let ``paginate : offset is positive``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.paginate<Employee> "
         select * from Employee order by EmployeeId
         " [] <| Range(Offset = 1L, Limit = 2L) }
@@ -72,7 +72,7 @@ module PaginateTest =
 
   [<Test>]
   let ``paginate : offset is positive : embedded variable in order by clause``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.paginate<Employee> "
          select * from Employee E order by /*#orderby*/
         " ["orderby" <-- "E.EmployeeId"] <| Range(Offset = 1L, Limit = 2L) }
@@ -87,7 +87,7 @@ module PaginateTest =
 
   [<Test>]
   let ``paginate : offset is zero``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.paginate<Employee> "
          select * from Employee order by EmployeeId
         " [] <| Range(Offset = 0L, Limit = 2L) }
@@ -102,7 +102,7 @@ module PaginateTest =
 
   [<Test>]
   let ``paginate : offset is negative``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.paginate<Employee> "
          select * from Employee order by EmployeeId
         " [] <| Range(Offset = -1L, Limit = 2L) }
@@ -117,7 +117,7 @@ module PaginateTest =
 
   [<Test>]
   let ``paginate : limit is positive``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.paginate<Employee> "
          select * from Employee order by EmployeeId
         " [] <| Range(Offset = 1L, Limit = 1L) }
@@ -131,7 +131,7 @@ module PaginateTest =
 
   [<Test>]
   let ``paginate : limit is zero``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.paginate<Employee> "
          select * from Employee order by EmployeeId
         " [] <| Range(Offset = 1L, Limit = 0L) }
@@ -143,7 +143,7 @@ module PaginateTest =
 
   [<Test>]
   let ``paginate : limit is negative``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.paginate<Employee> "
          select * from Employee order by EmployeeId
         " [] <| Range(Offset = 1L, Limit = -1L) }
@@ -159,7 +159,7 @@ module PaginateTest =
 
   [<Test>]
   let ``paginateAndCount``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.paginateAndCount<Employee> "
          select * from Employee order by EmployeeId
         " [] <| Range(Offset = 1L, Limit = 2L) }

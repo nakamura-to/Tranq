@@ -62,7 +62,7 @@ module FindTest =
 
   [<Test>]
   let ``find``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.find<Department> [2] }
     |> function
     | Success ret -> 
@@ -72,7 +72,7 @@ module FindTest =
 
   [<Test>]
   let ``find : by composite id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.find<CompKeyEmployee> [2; 12] }
     |> function
     | Success ret -> 
@@ -82,7 +82,7 @@ module FindTest =
 
   [<Test>]
   let ``find : id type is option``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.find<Employee> [Some 1] }
     |> function
     | Success ret -> 
@@ -94,7 +94,7 @@ module FindTest =
   (*
   [<Test>]
   let ``find : id type is option but param type is not option``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.find<Employee> [1] }
     |> function
     | Success ret -> 
@@ -105,7 +105,7 @@ module FindTest =
 
   [<Test>]
   let ``find : not found``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.find<Department> [99] }
     |> function
     | Success ret -> 
@@ -117,7 +117,7 @@ module FindTest =
 
   [<Test>]
   let ``find : not found : try with``() =
-    Runner.rollbackOnly <| txSupports {
+    Runner.rollbackOnly <| txRequired {
       try
         do! Db.find<Department> [99] |> Tx.ignore
         return true
@@ -131,7 +131,7 @@ module FindTest =
 
   [<Test>]
   let ``find : by empty id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.find<NoId> [] }
     |> function
     | Success _ -> 
@@ -141,7 +141,7 @@ module FindTest =
 
   [<Test>]
   let ``find : by id for no id record``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.find<NoId> [2] }
     |> function
     | Success _ -> 
@@ -151,7 +151,7 @@ module FindTest =
 
   [<Test>]
   let ``tryFind : id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.tryFind<Department> [2] }
     |> function
     | Success ret -> 
@@ -161,7 +161,7 @@ module FindTest =
 
   [<Test>]
   let ``tryFind : by composite id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.tryFind<CompKeyEmployee> [2; 12] }
     |> function
     | Success ret -> 
@@ -171,7 +171,7 @@ module FindTest =
 
   [<Test>]
   let ``tryFind : not found``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.tryFind<Department> [99] }
     |> function
     | Success ret -> 
@@ -181,7 +181,7 @@ module FindTest =
 
   [<Test>]
   let ``findWithVersion``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.findWithVersion<Department> [2] 0 }
     |> function
     | Success ret -> 
@@ -191,7 +191,7 @@ module FindTest =
 
   [<Test>]
   let ``findWithVersion : by composite id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.findWithVersion<CompKeyEmployee> [2; 12] 0 }
     |> function
     | Success ret -> 
@@ -201,7 +201,7 @@ module FindTest =
 
   [<Test>]
   let ``findWithVersion : not found``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.findWithVersion<Department> [99] 0 }
     |> function
     | Success ret -> 
@@ -213,7 +213,7 @@ module FindTest =
 
   [<Test>]
   let ``findWithVersion : not found : try with``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       try
         do! Db.findWithVersion<Department> [99] 0 |> Tx.ignore
         return true
@@ -227,7 +227,7 @@ module FindTest =
 
   [<Test>]
   let ``findWithVersion : optimistic lock confliction``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.findWithVersion<Department> [2] 99 }
     |> function
     | Success ret -> 
@@ -239,7 +239,7 @@ module FindTest =
 
   [<Test>]
   let ``tryFindWithVersion``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.tryFindWithVersion<Department> [2] 0 }
     |> function
     | Success ret -> 
@@ -249,7 +249,7 @@ module FindTest =
 
   [<Test>]
   let ``tryFindWithVersion : by composite id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.tryFindWithVersion<CompKeyEmployee> [2; 12] 0 }
     |> function
     | Success ret -> 
@@ -259,7 +259,7 @@ module FindTest =
 
   [<Test>]
   let ``tryFindWithVersion : not found``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.tryFindWithVersion<Department> [99] 0 }
     |> function
     | Success ret -> 
@@ -269,7 +269,7 @@ module FindTest =
 
   [<Test>]
   let ``tryFindWithVersion : optimistic lock confliction``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.tryFindWithVersion<Department> [2] 99 }
     |> function
     | Success ret -> 

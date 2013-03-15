@@ -50,7 +50,7 @@ module MappingTest =
   [<Test>]
   let ``default mapping``() =
     let guid = Guid.NewGuid()
-    Runner.rollbackOnly <| txSupports {
+    Runner.rollbackOnly <| txRequired {
       do! Db.insert<DefaultMapping> {
         DefaultMappingId = 1 
         ByteCol = 3uy
@@ -139,7 +139,7 @@ module MappingTest =
   [<Test>]
   let ``option mapping : some``() =
     let guid = Guid.NewGuid()
-    Runner.rollbackOnly <| txSupports {
+    Runner.rollbackOnly <| txRequired {
       do! Db.insert<OptionDefaultMapping> {
         DefaultMappingId = 1 
         ByteCol = Some 3uy
@@ -197,7 +197,7 @@ module MappingTest =
 
   [<Test>]
   let ``option mapping : none``() =
-    Runner.rollbackOnly <| txSupports {
+    Runner.rollbackOnly <| txRequired {
       do! Db.insert<OptionDefaultMapping> {
         DefaultMappingId = 1 
         ByteCol = None
@@ -260,7 +260,7 @@ module MappingTest =
 
   [<Test>]
   let ``timespan mapping``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       do! Db.insert<TimeSpanMapping> { 
         TimeSpanMappingId = 1 
         TimeSpanCol = TimeSpan(13, 14, 15) } |> Tx.ignore
@@ -281,7 +281,7 @@ module MappingTest =
 
   [<Test>]
   let ``option timespan mapping : some``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       do! Db.insert<OptionTimeSpanMapping> { 
         TimeSpanMappingId = 1 
         TimeSpanCol = Some <| TimeSpan(13, 14, 15) } |> Tx.ignore
@@ -296,7 +296,7 @@ module MappingTest =
 
   [<Test>]
   let ``option timespan mapping : none``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       do! Db.insert<OptionTimeSpanMapping> { 
         TimeSpanMappingId = 1 
         TimeSpanCol = None } |> Tx.ignore
@@ -318,7 +318,7 @@ module MappingTest =
 
   [<Test>]
   let ``lob mapping``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       do! Db.insert<LobMapping> { 
         LobMappingId = 1 
         VarBinaryCol = [| 1uy; 2uy; 3uy; |]
@@ -472,7 +472,7 @@ module MappingTest =
   [<Test>]
   let ``rich mapping``() =
     let guid = Guid.NewGuid()
-    rollbackOnly <| txSupports {
+    rollbackOnly <| txRequired {
       do! Db.insert<RichMapping> {
         DefaultMappingId = 1 
         ByteCol = 3uy |> Byte.Wrapper
@@ -561,7 +561,7 @@ module MappingTest =
   [<Test>]
   let ``option rich mapping : some``() =
     let guid = Guid.NewGuid()
-    rollbackOnly <| txSupports {
+    rollbackOnly <| txRequired {
       do! Db.insert<OptionRichMapping> {
         DefaultMappingId = 1 
         ByteCol = 3uy |> Byte.Wrapper |> Some
@@ -620,7 +620,7 @@ module MappingTest =
   [<Test>]
   let ``option rich mapping : none``() =
     let guid = Guid.NewGuid()
-    rollbackOnly <| txSupports {
+    rollbackOnly <| txRequired {
       do! Db.insert<OptionRichMapping> {
         DefaultMappingId = 1 
         ByteCol = None
@@ -810,7 +810,7 @@ module MappingTest =
   [<Test>]
   let ``rich opt mapping : some``() =
     let guid = Guid.NewGuid()
-    rollbackOnlyOpt <| txSupports {
+    rollbackOnlyOpt <| txRequired {
       do! Db.insert<RichOptMapping> {
         DefaultMappingId = 1 
         ByteCol = 3uy |> Some |> ByteOpt.Wrapper
@@ -869,7 +869,7 @@ module MappingTest =
   [<Test>]
   let ``rich opt mapping : noe``() =
     let guid = Guid.NewGuid()
-    rollbackOnlyOpt <| txSupports {
+    rollbackOnlyOpt <| txRequired {
       do! Db.insert<RichOptMapping> {
         DefaultMappingId = 1 
         ByteCol = None |> ByteOpt.Wrapper

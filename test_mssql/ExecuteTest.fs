@@ -43,7 +43,7 @@ module ExecuteTest =
 
   [<Test>]
   let ``execute : insert``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.execute "
         insert into Department (DepartmentId, DepartmentName, VersionNo) values (/* id */0, /* name */'aaa', /* version */0)
         " ["id" <-- 99; "name" <-- "hoge"; "version" <-- 10] }
@@ -55,7 +55,7 @@ module ExecuteTest =
 
   [<Test>]
   let ``execute : update``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.execute "
         update Department set DepartmentName = N'hoge' where DepartmentId = /* id */-1 and VersionNo = /* versionNo */-1
         " ["id" <-- 1; "versionNo" <-- 0] }
@@ -67,7 +67,7 @@ module ExecuteTest =
 
   [<Test>]
   let ``execute : delete``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.execute "
         delete from Department
         " [] }
@@ -79,7 +79,7 @@ module ExecuteTest =
 
   [<Test>]
   let ``executeReader``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.executeReader "
         select * from Department where DepartmentId = /* id */0
         " ["id" <-- 2] <| fun reader ->

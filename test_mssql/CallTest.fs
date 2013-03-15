@@ -110,7 +110,7 @@ module CallTest =
 
   [<Test>]
   let ``call : ProcNoneParam``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.call<ProcNoneParam> { Unit = () } }
     |> function
     | Success ret -> 
@@ -120,7 +120,7 @@ module CallTest =
 
   [<Test>]
   let ``call : ProcSingleParam``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.call<ProcSingleParam> { Param1 = 10 } }
     |> function
     | Success ret -> 
@@ -130,7 +130,7 @@ module CallTest =
 
   [<Test>]
   let ``call : PorcMultiParams``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.call<ProcMultiParams> { Param1 = 1; Hoge = 2; Param3 = 3 } }
     |> function
     | Success ret -> 
@@ -140,7 +140,7 @@ module CallTest =
 
   [<Test>]
   let ``call : ProcEntityResult``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.call<ProcEntityResult> { EmployeeId = 1; EmpList = [] } }
     |> function
     | Success ret -> 
@@ -155,7 +155,7 @@ module CallTest =
 
   [<Test>]
   let ``call : ProcTupleResult``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.call<ProcTupleResult> { EmployeeId = 1; EmpList = [] } }
     |> function
     | Success ret -> 
@@ -170,7 +170,7 @@ module CallTest =
 
   [<Test>]
   let ``call : ProcEntityResultAndOut``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.call<ProcEntityResultAndOut> { EmployeeId = 1; EmpList = [] ; EmployeeCount = 0 } }
     |> function
     | Success ret -> 
@@ -186,7 +186,7 @@ module CallTest =
 
   [<Test>]
   let ``call : ProcTupleResultAndOut``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.call<ProcTupleResultAndOut> { EmployeeId = 1; EmpList = [] ; EmployeeCount = 0 } }
     |> function
     | Success ret -> 
@@ -202,7 +202,7 @@ module CallTest =
 
   [<Test>]
   let ``call : ProcResultAndUpdate``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let! ret = Db.call<ProcResultAndUpdate> { EmployeeId = 1; EmpList = [] }
       let! dept = Db.find<Department> [1]
       return ret, dept }
@@ -220,7 +220,7 @@ module CallTest =
 
   [<Test>]
   let ``call : ProcUpdateAndResult``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let! ret = Db.call<ProcUpdateAndResult> { EmployeeId = 1; EmpList = [] }
       let! dept = Db.find<Department> [1]
       return ret, dept }
@@ -238,7 +238,7 @@ module CallTest =
 
   [<Test>]
   let ``call : ProcEntityResults``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.call<ProcEntityResults> { EmployeeId = 1; DepartmentId = 1; EmpList = [] ; DeptList = [] } }
     |> function
     | Success ret -> 
@@ -251,7 +251,7 @@ module CallTest =
 
   [<Test>]
   let ``call : ProcTupleResults``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.call<ProcTupleResults> { EmployeeId = 1; DepartmentId = 1; EmpList = [] ; DeptList = [] } }
     |> function
     | Success ret -> 
@@ -264,7 +264,7 @@ module CallTest =
 
   [<Test>]
   let ``call : FuncMultiParams``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.call<FuncMultiParams> { Param1 = 1; Param2 = 2; ReturnValue = 0 } }
     |> function
     | Success ret -> 

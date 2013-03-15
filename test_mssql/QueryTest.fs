@@ -59,7 +59,7 @@ module QueryTest =
 
   [<Test>]
   let ``query : 1 record``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.query<Department> "
         select * from Department where DepartmentId = /* id */0
         " ["id" <-- 2] }
@@ -72,7 +72,7 @@ module QueryTest =
 
   [<Test>]
   let ``query : 1 record by Enum value``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.query<Person> "
         select * from Person where JobKind = /* jobKind */0
         " ["jobKind" <-- JobKind.Manager] }
@@ -85,7 +85,7 @@ module QueryTest =
 
   [<Test>]
   let ``query : all records``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.query<Department> "
         select * from Department order by DepartmentId
         " [] }
@@ -100,7 +100,7 @@ module QueryTest =
 
   [<Test>]
   let ``query : 1 record: option``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.query<Employee> "
         select * from Employee where EmployeeId = 4
         " [] }
@@ -114,7 +114,7 @@ module QueryTest =
   [<Test>]
   let ``query : using if expression comment``() =
     let greaterThanZero id = id > 1
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.query<Department> "
         select * from Department where 
         /*% if greaterThanZero id */ 
@@ -130,7 +130,7 @@ module QueryTest =
 
   [<Test>]
   let ``query : using in operation``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.query<Department> "
         select * from Department where DepartmentId in /* id */(10, 20)
         " ["id" <-- [1; 2]] }
@@ -145,7 +145,7 @@ module QueryTest =
 
   [<Test>]
   let ``query : 1 tuple``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.query<int * string * int> "
         select DepartmentId, DepartmentName, VersionNo from Department where DepartmentId = /* id */0
         " ["id" <-- 2] }
@@ -158,7 +158,7 @@ module QueryTest =
 
   [<Test>]
   let ``query : all tuples``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.query<int * string * int> "
         select * from Department
         " ["id" <-- 2] }
@@ -171,7 +171,7 @@ module QueryTest =
 
   [<Test>]
   let ``query : 1 tuple : record mixed``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.query<string * Employee> "
         select d.DepartmentName, e.* from Department d inner join Employee e on (d.DepartmentId = e.DepartmentId) where d.DepartmentId = /* id */0
         " ["id" <-- 2] }
@@ -185,7 +185,7 @@ module QueryTest =
 
   [<Test>]
   let ``query : 1 single``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.query<string> "
         select DepartmentName from Department where DepartmentId = /* id */0
         " ["id" <-- 2] }
@@ -198,7 +198,7 @@ module QueryTest =
 
   [<Test>]
   let ``query : column not found``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.query<Department> "
         select DepartmentName from Department where DepartmentId = /* id */0
         " ["id" <-- 2] }
@@ -211,7 +211,7 @@ module QueryTest =
 
   [<Test>]
   let ``query : 1 record : column duplicated``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.query<Duplication> "
         select DepartmentId aaa, DepartmentName bbb, VersionNo aaa from Department where DepartmentId = /* id */0
         " ["id" <-- 2] }

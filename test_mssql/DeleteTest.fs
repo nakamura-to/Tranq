@@ -51,7 +51,7 @@ module DeleteTest =
 
   [<Test>]
   let ``delete : no id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.delete { NoId.Name = "aaa"; VersionNo = 0 } }
     |> function
     | Success ret -> 
@@ -61,7 +61,7 @@ module DeleteTest =
 
   [<Test>]
   let ``delete : no version``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.delete { NoVersion.Id = 1; Name = "aaa" } }
     |> function
     | Success ret -> 
@@ -71,7 +71,7 @@ module DeleteTest =
 
   [<Test>]
   let ``delete : incremented version``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let! department = Db.find<Department> [1]
       return! Db.delete department }
     |> function
@@ -82,7 +82,7 @@ module DeleteTest =
 
   [<Test>]
   let ``delete : computed version``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let! address = Db.insert { AddressId = 0; Street = "hoge"; VersionNo = Array.empty }
       return! Db.delete address }
     |> function
@@ -93,7 +93,7 @@ module DeleteTest =
 
   [<Test>]
   let ``delete : incremented version : optimistic lock confliction``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.delete { DepartmentId = 1; DepartmentName = "hoge"; VersionNo = -1 } }
     |> function
     | Success ret -> 
@@ -105,7 +105,7 @@ module DeleteTest =
 
   [<Test>]
   let ``delete : computed version : optimistic lock confliction``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.delete { AddressId = 1; Street = "hoge"; VersionNo = Array.empty } }
     |> function
     | Success ret -> 
@@ -117,7 +117,7 @@ module DeleteTest =
 
   [<Test>]
   let ``deleteIgnoreVersion``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let opt = DeleteOpt(IgnoreVersion = true)
       return! Db.deleteWithOpt { DepartmentId = 1; DepartmentName = "aaa"; VersionNo = -1 } opt }
     |> function
@@ -128,7 +128,7 @@ module DeleteTest =
 
   [<Test>]
   let ``deleteIgnoreVersion : no affected row``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let opt = DeleteOpt(IgnoreVersion = true)
       return! Db.deleteWithOpt { DepartmentId = 0; DepartmentName = "aaa"; VersionNo = -1 } opt }
     |> function

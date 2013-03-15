@@ -72,7 +72,7 @@ module UpdateTest =
 
   [<Test>]
   let ``update : no id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.update { NoId.Name = "aaa"; VersionNo = 0 } }
     |> function
     | Success ret -> 
@@ -82,7 +82,7 @@ module UpdateTest =
 
   [<Test>]
   let ``update : composite id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let! employee = Db.find<CompKeyEmployee> [2; 12]
       return! Db.update { employee with EmployeeName = "hoge" } }
     |> function
@@ -93,7 +93,7 @@ module UpdateTest =
 
   [<Test>]
   let ``update : no version``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.update { NoVersion.Id = 1; Name = "aaa" } }
     |> function
     | Success ret -> 
@@ -103,7 +103,7 @@ module UpdateTest =
 
   [<Test>]
   let ``update : incremented version``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.update { DepartmentId = 1; DepartmentName = "hoge"; VersionNo = 0 } }
     |> function
     | Success ret -> 
@@ -114,7 +114,7 @@ module UpdateTest =
   [<Test>]
   let ``update : computed version``() =
     let version = ref ([||] : byte array)
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let! address = Db.insert { Address.AddressId = 0; Street = "hoge"; VersionNo = Array.empty }
       let address = { address with Street = "foo" }
       version := address.VersionNo
@@ -127,7 +127,7 @@ module UpdateTest =
 
   [<Test>]
   let ``update : Enum``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let! person = Db.find<Person> [2]
       return! Db.update { person with JobKind = JobKind.Salesman } }
     |> function
@@ -138,7 +138,7 @@ module UpdateTest =
 
   [<Test>]
   let ``update : unique constraint violation``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.update { DepartmentId = 1; DepartmentName = "Sales"; VersionNo = 0 } }
     |> function
     | Success ret -> 
@@ -150,7 +150,7 @@ module UpdateTest =
 
   [<Test>]
   let ``update : optimistic lock confliction``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.update { DepartmentId = 1; DepartmentName = "hoge"; VersionNo = -1 } }
     |> function
     | Success ret -> 
@@ -162,7 +162,7 @@ module UpdateTest =
 
   [<Test>]
   let ``updateIgnoreVersion``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let opt = UpdateOpt(IgnoreVersion = true) 
       return! Db.updateWithOpt { DepartmentId = 1; DepartmentName = "hoge"; VersionNo = -1 } opt }
     |> function
@@ -173,7 +173,7 @@ module UpdateTest =
 
   [<Test>]
   let ``updateIgnoreVersion : no affected row``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let opt = UpdateOpt(IgnoreVersion = true) 
       return! Db.updateWithOpt { DepartmentId = 0; DepartmentName = "hoge"; VersionNo = -1 } opt }
     |> function
@@ -185,7 +185,7 @@ module UpdateTest =
   (* TODO
   [<Test>]
   let ``update : exclude none``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let! employee = Db.find<Employee> [1]
       let opt = UpdateOpt(ExcludeNone = true) 
       return! Db.updateWithOpt { employee with EmployeeName = None} opt }
@@ -198,7 +198,7 @@ module UpdateTest =
 
   [<Test>]
   let ``update : exclude none``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let! employee = Db.find<Employee> [Some 1]
       let opt = UpdateOpt(ExcludeNone = true) 
       do! Db.updateWithOpt { employee with EmployeeName = None} opt |> Tx.ignore
@@ -211,7 +211,7 @@ module UpdateTest =
 
   [<Test>]
   let ``update : exclude``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let! employee = Db.find<Employee> [Some 1]
       let opt = UpdateOpt(Exclude = ["EmployeeName"]) 
       do! Db.updateWithOpt { employee with EmployeeName = Some "hoge"; DepartmentId = Some 2} opt |> Tx.ignore
@@ -225,7 +225,7 @@ module UpdateTest =
 
   [<Test>]
   let ``update : include``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let! employee = Db.find<Employee> [Some 1]
       let opt = UpdateOpt(Include = ["EmployeeName"]) 
       do! Db.updateWithOpt { employee with EmployeeName = Some "hoge"; DepartmentId = Some 2} opt |> Tx.ignore

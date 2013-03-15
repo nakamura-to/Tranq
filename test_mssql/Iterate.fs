@@ -29,7 +29,7 @@ module IterateTest =
   [<Test>]
   let ``iterate``() =
     let array = ResizeArray()
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.iterate<Employee> "
         select * from Employee order by EmployeeId
         " 
@@ -47,7 +47,7 @@ module IterateTest =
   [<Test>]
   let ``iterate : break``() =
     let array = ResizeArray()
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       return! Db.iterate<Employee> "
         select * from Employee order by EmployeeId
         " 

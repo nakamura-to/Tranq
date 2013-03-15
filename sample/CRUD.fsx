@@ -1,5 +1,5 @@
-﻿#r @"bin\Debug\FSharp.PowerPack.dll"
-#r @"bin\Debug\Tranq.dll"
+﻿#r @"lib\FSharp.PowerPack.dll"
+#r @"lib\Tranq.dll"
 
 open Tranq
 
@@ -36,13 +36,3 @@ let workflow = txRequired {
 Tx.eval config workflow |> function
 | Success ret -> printfn "success: %A\n" ret
 | Failure exn -> printfn "failure: %A\n" exn
-
-(* OUTPUT
-LOG: if exists (select * from dbo.sysobjects where id = object_id(N'Person')) drop table Person;
-      create table Person (Id int primary key, Email varchar(50), Age int, Version int);
-LOG: insert into Person ( Id, Email, Age, Version ) values ( 1, N'hoge@example.com', 20, 1 )
-LOG: select Id, Email, Age, Version from Person where Id = 1
-LOG: update Person set Email = N'hoge@sample.com', Age = 20, Version = Version + 1 where Id = 1 and Version = 1
-LOG: delete from Person where Id = 1 and Version = 2
-success: <null>
-*)

@@ -72,7 +72,7 @@ module InsertTest =
 
   [<Test>]
   let ``insert : assigned id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let department = { DepartmentId = 99; DepartmentName = "aaa"; VersionNo = 0 }
       return! Db.insert department }
     |> function
@@ -83,7 +83,7 @@ module InsertTest =
 
   [<Test>]
   let ``insert : assigned composite id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let employee = { EmployeeId1 = 99; EmployeeId2 = 1; EmployeeName = "aaa"; VersionNo = 0 }
       return! Db.insert employee }
     |> function
@@ -94,7 +94,7 @@ module InsertTest =
 
   [<Test>]
   let ``insert : identity id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let employee = { Employee.EmployeeId = None; EmployeeName = Some "hoge"; DepartmentId = Some 1; VersionNo = Some 0 }
       return! Db.insert employee }
     |> function
@@ -106,7 +106,7 @@ module InsertTest =
 
   [<Test>]
   let ``insert : no id``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let noId = { NoId.Name = "aaa"; VersionNo = 0 }
       return! Db.insert noId }
     |> function
@@ -117,7 +117,7 @@ module InsertTest =
 
   [<Test>]
   let ``insert : no version``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let noVersion = { NoVersion.Id = 99; Name = "aaa" }
       return! Db.insert noVersion }
     |> function
@@ -128,7 +128,7 @@ module InsertTest =
 
   [<Test>]
   let ``insert : unique constraint violation : unique key``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let department = { DepartmentId = 1; DepartmentName = "aaa"; VersionNo = 0 }
       return! Db.insert department }
     |> function
@@ -141,7 +141,7 @@ module InsertTest =
 
   [<Test>]
   let ``insert : unique constraint violation : unique index``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let person = { PersonId = 0; PersonName = "Scott"; JobKind = JobKind.Salesman; VersionNo = 0 }
       return! Db.insert person }
     |> function
@@ -154,7 +154,7 @@ module InsertTest =
 
   [<Test>]
   let ``insert : incremented version``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let employee = { Employee.EmployeeId = None; EmployeeName = None; DepartmentId = Some 1; VersionNo = None }
       return! Db.insert employee }
     |> function
@@ -166,7 +166,7 @@ module InsertTest =
 
   [<Test>]
   let ``insert : computed version``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let address = { Address.AddressId = 0; Street = "hoge"; VersionNo = Array.empty }
       return! Db.insert address }
     |> function
@@ -177,7 +177,7 @@ module InsertTest =
 
   [<Test>]
   let ``insert : exclude none``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let employee = { Employee.EmployeeId = None; EmployeeName = None; DepartmentId = None; VersionNo = Some 0 }
       return! Db.insertWithOpt employee (InsertOpt(ExcludeNone = true)) }
     |> function
@@ -188,7 +188,7 @@ module InsertTest =
 
   [<Test>]
   let ``insert : exclude``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let employee = { Employee.EmployeeId = None; EmployeeName = Some "hoge"; DepartmentId = Some 1; VersionNo = Some 0 }
       return! Db.insertWithOpt employee (InsertOpt(Exclude = ["EmployeeName"])) }
     |> function
@@ -199,7 +199,7 @@ module InsertTest =
 
   [<Test>]
   let ``insert : include``() =
-    Runner.rollbackOnly <| txSupports { 
+    Runner.rollbackOnly <| txRequired { 
       let employee = { Employee.EmployeeId = None; EmployeeName = Some "hoge"; DepartmentId = Some 1; VersionNo = Some 0 }
       return! Db.insertWithOpt employee (InsertOpt(Include = ["EmployeeName"])) }
     |> function
