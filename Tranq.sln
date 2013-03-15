@@ -7,6 +7,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.Test", "test\Tranq.Te
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.Test.Console", "test_console\Tranq.Test.Console.fsproj", "{1C4F74EB-A174-41E8-AD89-AD386AF7654D}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.GlobalTx", "Tranq.Global\Tranq.GlobalTx.fsproj", "{FCF7B9AE-B345-4836-81DA-EEDD95790724}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,6 +27,10 @@ Global
 		{1C4F74EB-A174-41E8-AD89-AD386AF7654D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1C4F74EB-A174-41E8-AD89-AD386AF7654D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1C4F74EB-A174-41E8-AD89-AD386AF7654D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FCF7B9AE-B345-4836-81DA-EEDD95790724}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FCF7B9AE-B345-4836-81DA-EEDD95790724}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FCF7B9AE-B345-4836-81DA-EEDD95790724}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FCF7B9AE-B345-4836-81DA-EEDD95790724}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

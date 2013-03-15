@@ -103,8 +103,8 @@
       <!----></PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>copy /y $(TargetDir) /b $(ProjectDir)\..\sample\lib /b
-copy /y $(TargetDir) /b $(ProjectDir)\..\test_mssql\lib /b</PostBuildEvent>
+    <PostBuildEvent>copy /y $(TargetDir) /b $(ProjectDir)..\sample\lib /b
+copy /y $(TargetDir) /b $(ProjectDir)..\test_mssql\lib /b</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

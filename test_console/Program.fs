@@ -83,6 +83,34 @@ let workflow3 = txRequired {
     Version = Version.make 0 }
   do! PersonDao.delete person }
 
+open Tranq.GlobalTx
+
+/// query, increment age and then update
+let gtx_workflow1 = txRequired {
+  do! init
+  let! persons = PersonDao.all()
+  return! persons 
+    |> List.map Person.incrAge 
+    |> Tx.mapM PersonDao.update }
+
+// query by name and query by identifier
+let gtx_workflow2 = txRequired.With(TxIsolationLevel.ReadUncommitted) {
+  do! init
+  let email = Email.make "hoge@example.com"
+  let! p1 = PersonDao.byEmail email
+  let! p2 = PersonDao.byId 2
+  return p1 @ [p2] }
+
+// insert and delete
+let gtx_workflow3 = txRequired {
+  do! init
+  let! person = PersonDao.insert {
+    Id = 99
+    Email = Email.make "fuga@example.com"
+    Age = Age.make (Some 20)
+    Version = Version.make 0 }
+  do! PersonDao.delete person }
+
 let config = 
   let registry = DataConvRegistry()
   registry.Add(Email.conv)
@@ -91,12 +119,10 @@ let config =
   let connectionString = "Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;" 
   let log = printfn "LOG: %s"
   let listener = function
-    | TxBegun(txId, _, _)-> log (sprintf "txId=%d, tx begin" txId)
-    | TxCommitted(txId, _, _)-> log (sprintf "txId=%d, tx commit" txId)
-    | TxRolledback(txId, _, _)-> log (sprintf "txId=%d, tx rollback" txId)
-    | SqlIssuing(txId, stmt) -> 
-      let txId = match txId with Some v -> string v | _ -> ""
-      log (sprintf "txId=%s, sql=[%s]" txId stmt.FormattedText)
+    | TxBegun(txInfo, _, _)-> log (sprintf "txInfo=%A, tx begin" txInfo)
+    | TxCommitted(txInfo, _, _)-> log (sprintf "txInfo=%A, tx commit" txInfo)
+    | TxRolledback(txInfo, _, _)-> log (sprintf "txInfo=%A, tx rollback" txInfo)
+    | SqlIssuing(txInfo, stmt) -> log (sprintf "txInfo=%A, sql=[%s]" txInfo stmt.FormattedText)
   { Dialect = MsSqlDialect(registry)
     ConnectionProvider = fun () -> new SqlConnection(connectionString) :> DbConnection
     Listener = listener }
@@ -114,4 +140,12 @@ let main argv =
   eval workflow2
   printfn "------------- workflow3 -------------"
   eval workflow3
+
+  printfn "------------- gtx_workflow1 -------------"
+  eval gtx_workflow1
+  printfn "------------- gtx_workflow2 -------------"
+  eval gtx_workflow2
+  printfn "------------- gtx_workflow3 -------------"
+  eval gtx_workflow3
+
   System.Console.ReadKey() |> fun _ -> 0

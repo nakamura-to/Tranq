@@ -254,11 +254,13 @@ type TxAttr = Required | RequiresNew | Supports | NotSupported
 
 type TxIsolationLevel = ReadUncommitted | ReadCommitted | RepeatableRead | Serializable | Snapshot
 
+type TxInfo = { LocalId: string; GlobalId: Guid }
+
 type TxEvent = 
-  | TxBegun of int * TxAttr * TxIsolationLevel
-  | TxCommitted of int * TxAttr * TxIsolationLevel
-  | TxRolledback of int * TxAttr * TxIsolationLevel
-  | SqlIssuing of int option * PreparedStatement
+  | TxBegun of TxInfo * TxAttr * TxIsolationLevel
+  | TxCommitted of TxInfo * TxAttr * TxIsolationLevel
+  | TxRolledback of TxInfo * TxAttr * TxIsolationLevel
+  | SqlIssuing of TxInfo option * PreparedStatement
 
 type Tx<'R> = Tx of (TxContext -> TxResult<'R> * TxState)
  
@@ -271,6 +273,7 @@ and TxContext = {
   Config: TxConfig
   Connection: DbConnection
   Transaction: DbTransaction option
+  TransactionInfo: TxInfo option
   State: TxState }
 
 exception Abort of string
@@ -294,7 +297,7 @@ module Tx =
   /// Aborts a transaction with a format
   let inline abortwithf fmt  = Printf.ksprintf abortwith fmt
 
-  let inline internal runCore (Tx tx) ctx = 
+  let runCore (Tx tx) ctx = 
     tx ctx
 
   let inline returnM m = Tx(fun {State = state} -> Success m, state)
@@ -334,6 +337,7 @@ module Tx =
         Config = config
         Connection = con
         Transaction = None
+        TransactionInfo = None
         State = state }
       runCore workflow ctx
     with e -> 
@@ -348,7 +352,7 @@ module Tx =
     run config workflow |> snd
 
 type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
-  let toAdoTx = function
+  let adoIsolationLevel = function
     | ReadUncommitted -> System.Data.IsolationLevel.ReadUncommitted
     | ReadCommitted -> System.Data.IsolationLevel.ReadCommitted
     | RepeatableRead -> System.Data.IsolationLevel.RepeatableRead
@@ -377,30 +381,34 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
   member this.For(sequence:seq<_>, body) =
     this.Using(sequence.GetEnumerator(),
       (fun enum -> this.While(enum.MoveNext, this.Delay(fun () -> body enum.Current))))
-  member this.Run(f) = Tx(fun ({Config = config; Connection = con; Transaction = tx; State = state} as ctx) ->
+  abstract Run<'T> : Tx<'T> -> Tx<'T>
+  default this.Run(f) = Tx(fun ({Config = config; Connection = con; Transaction = tx; State = state} as ctx) ->
     let listener = config.Listener
     let runCore ctx = Tx.runCore f ctx
-    let begin_ (tx: DbTransaction) =
-      config.Listener (TxBegun (tx.GetHashCode(), txAttr, txIsolatioinLevel))
-    let commit (tx: DbTransaction) =
-      tx.Commit()
-      config.Listener (TxCommitted (tx.GetHashCode(), txAttr, txIsolatioinLevel))
-    let rollback (tx: DbTransaction) = 
-      tx.Rollback()
-      config.Listener (TxRolledback (tx.GetHashCode(), txAttr, txIsolatioinLevel))
-    let completeTx tx (result, state) =
+    let notifyBegin txInfo =
+      config.Listener (TxBegun (txInfo, txAttr, txIsolatioinLevel))
+    let notifyCommit txInfo =
+      config.Listener (TxCommitted (txInfo, txAttr, txIsolatioinLevel))
+    let notifyRollback txInfo = 
+      config.Listener (TxRolledback (txInfo, txAttr, txIsolatioinLevel))
+    let complete (tx: DbTransaction) txInfo (result, state) =
       match result with
       | Success value -> 
         try
           if state.IsRollbackOnly then
-            rollback tx
+            tx.Rollback()
+            notifyRollback txInfo
           else
-            commit tx
+            tx.Commit()
+            notifyCommit txInfo
           Success value, state
         with e ->
           Failure e, state
       | Failure exn ->
-        try rollback tx with e -> ()
+        try 
+          tx.Rollback() 
+          notifyRollback txInfo
+        with e -> ()
         Failure exn, state 
     match txAttr, tx with
     | Required, Some _
@@ -409,22 +417,40 @@ type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
     | Required, None
     | RequiresNew, None ->
       con.ConfirmOpen()
-      use tx = con.BeginTransaction(toAdoTx txIsolatioinLevel)
-      begin_ tx
-      runCore {ctx with Connection = con; Transaction = Some tx; State = {IsRollbackOnly = false}}
-      |> completeTx tx
+      use tx = con.BeginTransaction(adoIsolationLevel txIsolatioinLevel)
+      let txInfo = { LocalId = string <| tx.GetHashCode(); GlobalId = Guid.Empty }
+      notifyBegin txInfo
+      runCore {
+        ctx with 
+          Connection = con
+          Transaction = Some tx
+          TransactionInfo = Some txInfo
+          State = {IsRollbackOnly = false}}
+      |> complete tx txInfo
     | RequiresNew, Some _ ->
       use con = config.ConnectionProvider()
       con.ConfirmOpen()
-      use tx = con.BeginTransaction(toAdoTx txIsolatioinLevel)
-      begin_ tx
-      runCore {ctx with Connection = con; Transaction = Some tx; State = {IsRollbackOnly = false}}
-      |> completeTx tx
+      use tx = con.BeginTransaction(adoIsolationLevel txIsolatioinLevel)
+      let txInfo = { LocalId = string <| tx.GetHashCode(); GlobalId = Guid.Empty }
+      notifyBegin txInfo
+      runCore { 
+        ctx with 
+          Connection = con
+          Transaction = Some tx
+          TransactionInfo = Some txInfo
+          State = {IsRollbackOnly = false}}
+      |> complete  tx txInfo
     | NotSupported, _ -> 
       use con = config.ConnectionProvider()
       con.ConfirmOpen()
-      runCore {ctx with Connection = con; Transaction = None; State = {IsRollbackOnly = false}})
-  member this.With(newTxIsolatioinLevel) = TxBuilder(txAttr, newTxIsolatioinLevel)
+      runCore {
+        ctx with 
+          Connection = con
+          Transaction = None
+          TransactionInfo = None
+          State = {IsRollbackOnly = false}})
+  abstract With : TxIsolationLevel -> TxBuilder 
+  default this.With(newTxIsolatioinLevel) = TxBuilder(txAttr, newTxIsolatioinLevel)
 
 [<AutoOpen>]
 module Directives =

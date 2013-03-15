@@ -23,12 +23,10 @@ module Runner =
     let connectionString = "Data Source=.\SQLEXPRESS;Initial Catalog=TranqTest;Integrated Security=True;" 
     let log text = stdout.WriteLine("LOG: " + text)
     let listener = function
-      | TxBegun(txId, _, _)-> log (sprintf "txId=%d, tx begin" txId)
-      | TxCommitted(txId, _, _)-> log (sprintf "txId=%d, tx commit" txId)
-      | TxRolledback(txId, _, _)-> log (sprintf "txId=%d, tx rollback" txId)
-      | SqlIssuing(txId, stmt) -> 
-        let txId = match txId with Some v -> string v | _ -> ""
-        log (sprintf "txId=%s, sql=[%s]" txId stmt.FormattedText)
+      | TxBegun(txInfo, _, _)-> log (sprintf "txInfo=%A, tx begin" txInfo)
+      | TxCommitted(txInfo, _, _)-> log (sprintf "txInfo=%A, tx commit" txInfo)
+      | TxRolledback(txInfo, _, _)-> log (sprintf "txInfo=%A, tx rollback" txInfo)
+      | SqlIssuing(txInfo, stmt) -> log (sprintf "txInfo=%A, sql=[%s]" txInfo stmt.FormattedText)
     { Dialect = MsSqlDialect()
       ConnectionProvider = fun () -> new SqlConnection(connectionString) :> DbConnection
       Listener = listener }

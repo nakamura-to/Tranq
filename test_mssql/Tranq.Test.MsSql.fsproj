@@ -51,6 +51,9 @@
     <Reference Include="Tranq">
       <HintPath>lib\Tranq.dll</HintPath>
     </Reference>
+    <Reference Include="Tranq.Global">
+      <HintPath>lib\Tranq.Global.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Util.fs" />
@@ -64,6 +67,7 @@
     <Compile Include="DeleteTest.fs" />
     <Compile Include="CallTest.fs" />
     <Compile Include="MappingTest.fs" />
+    <Compile Include="GlobalTx.fs" />
     <None Include="create.sql" />
     <None Include="packages.config" />
   </ItemGroup>
