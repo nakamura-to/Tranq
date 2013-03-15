@@ -8,7 +8,7 @@
     <ProjectGuid>fcf7b9ae-b345-4836-81da-eedd95790724</ProjectGuid>
     <OutputType>Library</OutputType>
     <RootNamespace>Tranq.Global</RootNamespace>
-    <AssemblyName>Tranq.Global</AssemblyName>
+    <AssemblyName>Tranq.GlobalTx</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <Name>Tranq.GlobalTx</Name>
     <RunPostBuildEvent>OnOutputUpdated</RunPostBuildEvent>
@@ -21,7 +21,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <DocumentationFile>bin\Debug\Tranq.Global.XML</DocumentationFile>
+    <DocumentationFile>bin\Debug\Tranq.GlobalTx.XML</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -34,7 +34,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="FSharp.PowerPack">
-      <HintPath>..\tools\FSharpPowerPack-4.0.0.0\bin\FSharp.PowerPack.dll</HintPath>
+      <HintPath>..\..\tools\FSharpPowerPack-4.0.0.0\bin\FSharp.PowerPack.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=4.3.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
@@ -50,7 +50,7 @@
     <Compile Include="Core.fs" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\src\Tranq.fsproj">
+    <ProjectReference Include="..\Tranq\Tranq.fsproj">
       <Name>Tranq</Name>
       <Project>{f1e3515e-e90f-4a4b-ba31-f3f88e82a99d}</Project>
       <Private>True</Private>
@@ -61,7 +61,8 @@
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')" />
   <PropertyGroup>
-    <PostBuildEvent>copy /y $(TargetDir)Tranq.Global.* /b $(ProjectDir)..\test_mssql\lib /b</PostBuildEvent>
+    <PostBuildEvent>copy /y $(TargetDir)Tranq.GlobalTx.* /b $(ProjectDir)..\..\samples\Tranq.Sample\lib /b
+copy /y $(TargetDir)Tranq.GlobalTx.* /b $(ProjectDir)..\..\tests\Tranq.Test.MsSql\lib /b</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

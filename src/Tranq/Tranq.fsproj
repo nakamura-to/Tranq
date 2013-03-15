@@ -37,13 +37,7 @@
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildExtensionsPath32)\..\Microsoft SDKs\F#\3.0\Framework\v4.0\Microsoft.FSharp.Targets')" />
-  <Import Project="..\tools\FSharpPowerPack-4.0.0.0\bin\FSharp.PowerPack.targets" />
-  <PropertyGroup>
-    <FsLexToolPath>..\tools\FSharpPowerPack-4.0.0.0\bin\</FsLexToolPath>
-    <FsLexToolExe>fslex.exe</FsLexToolExe>
-    <FsYaccToolPath>..\tools\FSharpPowerPack-4.0.0.0\bin\</FsYaccToolPath>
-    <FsYaccToolExe>fsyacc.exe</FsYaccToolExe>
-  </PropertyGroup>
+  <Import Project="..\..\tools\FSharpPowerPack-4.0.0.0\bin\FSharp.PowerPack.targets" />
   <ItemGroup>
     <Compile Include="SR.fs" />
     <Compile Include="Util.fs" />
@@ -81,7 +75,7 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.PowerPack">
-      <HintPath>..\tools\FSharpPowerPack-4.0.0.0\bin\FSharp.PowerPack.dll</HintPath>
+      <HintPath>..\..\tools\FSharpPowerPack-4.0.0.0\bin\FSharp.PowerPack.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=4.3.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
@@ -96,15 +90,15 @@
     <PreBuildEvent>
       <!---->
       cd "$(ProjectDir)"
-      "$(ProjectDir)..\tools\FSharpPowerPack-4.0.0.0\bin\fsyacc.exe" "ExprParser.fsy" --internal --module "Tranq.ExprParser"
-      "$(ProjectDir)..\tools\FSharpPowerPack-4.0.0.0\bin\fslex.exe" "ExprLexer.fsl" --unicode
-      "$(ProjectDir)..\tools\FSharpPowerPack-4.0.0.0\bin\fsyacc.exe" "SqlParser.fsy" --internal --module "Tranq.SqlParser"
-      "$(ProjectDir)..\tools\FSharpPowerPack-4.0.0.0\bin\fslex.exe" "SqlLexer.fsl" --unicode
+      "$(ProjectDir)..\..\tools\FSharpPowerPack-4.0.0.0\bin\fsyacc.exe" "ExprParser.fsy" --internal --module "Tranq.ExprParser"
+      "$(ProjectDir)..\..\tools\FSharpPowerPack-4.0.0.0\bin\fslex.exe" "ExprLexer.fsl" --unicode
+      "$(ProjectDir)..\..\tools\FSharpPowerPack-4.0.0.0\bin\fsyacc.exe" "SqlParser.fsy" --internal --module "Tranq.SqlParser"
+      "$(ProjectDir)..\..\tools\FSharpPowerPack-4.0.0.0\bin\fslex.exe" "SqlLexer.fsl" --unicode
       <!----></PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>copy /y $(TargetDir) /b $(ProjectDir)..\sample\lib /b
-copy /y $(TargetDir) /b $(ProjectDir)..\test_mssql\lib /b</PostBuildEvent>
+    <PostBuildEvent>copy /y $(TargetDir) /b $(ProjectDir)..\..\samples\Tranq.Sample\lib /b
+copy /y $(TargetDir) /b $(ProjectDir)..\..\tests\Tranq.Test.MsSql\lib /b</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

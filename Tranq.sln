@@ -1,13 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq", "src\Tranq.fsproj", "{F1E3515E-E90F-4A4B-BA31-F3F88E82A99D}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq", "src\Tranq\Tranq.fsproj", "{F1E3515E-E90F-4A4B-BA31-F3F88E82A99D}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.Test", "test\Tranq.Test.fsproj", "{28F7B37E-69F3-4884-8E75-D559A13A4EFB}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.GlobalTx", "src\Tranq.GlobalTx\Tranq.GlobalTx.fsproj", "{FCF7B9AE-B345-4836-81DA-EEDD95790724}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.Test.Console", "test_console\Tranq.Test.Console.fsproj", "{1C4F74EB-A174-41E8-AD89-AD386AF7654D}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.Test", "tests\Tranq.Test\Tranq.Test.fsproj", "{28F7B37E-69F3-4884-8E75-D559A13A4EFB}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.GlobalTx", "Tranq.Global\Tranq.GlobalTx.fsproj", "{FCF7B9AE-B345-4836-81DA-EEDD95790724}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.Test.Console", "tests\Tranq.Test.Console\Tranq.Test.Console.fsproj", "{1C4F74EB-A174-41E8-AD89-AD386AF7654D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

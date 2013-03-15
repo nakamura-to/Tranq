@@ -40,7 +40,7 @@
       <Private>True</Private>
     </Reference>
     <Reference Include="nunit.framework">
-      <HintPath>..\packages\NUnit.2.6.2\lib\nunit.framework.dll</HintPath>
+      <HintPath>..\..\packages\NUnit.2.6.2\lib\nunit.framework.dll</HintPath>
       <Private>True</Private>
     </Reference>
     <Reference Include="System" />
@@ -51,8 +51,8 @@
     <Reference Include="Tranq">
       <HintPath>lib\Tranq.dll</HintPath>
     </Reference>
-    <Reference Include="Tranq.Global">
-      <HintPath>lib\Tranq.Global.dll</HintPath>
+    <Reference Include="Tranq.GlobalTx">
+      <HintPath>lib\Tranq.GlobalTx.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>

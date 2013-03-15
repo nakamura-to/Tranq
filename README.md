@@ -5,7 +5,6 @@ The Transaction Query Executor Libary (Tranq.dll) implements transaction computa
 Following RDBMSs are supported
 
 - SQL Server
-- Oracle Database
 
 ## Documentation
 

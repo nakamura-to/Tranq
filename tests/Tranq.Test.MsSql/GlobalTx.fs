@@ -15,7 +15,7 @@ namespace Tranq.Test.MsSql
 open System
 open NUnit.Framework
 open Tranq
-open Tranq.Global
+open Tranq.GlobalTx
 
 module GlobalTxTest = 
 

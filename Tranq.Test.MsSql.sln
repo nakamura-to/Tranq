@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.Test.MsSql", "test_mssql\Tranq.Test.MsSql.fsproj", "{2EE5CF5C-EB11-4FAA-BB4B-D18AC4DD0AF6}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.Test.MsSql", "tests\Tranq.Test.MsSql\Tranq.Test.MsSql.fsproj", "{2EE5CF5C-EB11-4FAA-BB4B-D18AC4DD0AF6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
