@@ -84,14 +84,6 @@ module SeqTest =
     | :? (list<int>) ->()
     | _ -> fail ()
 
-  [<Test>]
-  let ``changeTypeFromSeqToResizeArray`` () =
-    let seq:seq<obj> = seq { yield box 1; yield box 2 }
-    let list = Seq.changeToResizeArray typeof<int> seq
-    match list with
-    | :? (ResizeArray<int>) ->()
-    | _ -> fail ()
-
 module NumberTest =
   open System
 

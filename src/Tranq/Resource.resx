@@ -277,7 +277,7 @@
     <value>The property({0}) of the entity type({1}) must not be specified as both Id and Version.</value>
   </data>
   <data name="TRANQ3006" xml:space="preserve">
-    <value>The type({0}) of the property({1}) which accepts a result from a stored procedure must be Microsoft.FSharp.Collections.FSharpList or be compatible to with System.Collections.Generic.IList.</value>
+    <value>The type({0}) of the property({1}) which accepts a result from a stored procedure must be Microsoft.FSharp.Collections.FSharpList.</value>
   </data>
   <data name="TRANQ3007" xml:space="preserve">
     <value>The type({0}) must have a public no-arg constructor.</value>

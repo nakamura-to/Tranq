@@ -405,13 +405,6 @@ module ProcedureParamMeta =
     else 
       None
 
-  let private (|IList|_|) (typ:Type) =
-    [| typ |]
-    |> Array.append (typ.GetInterfaces())
-    |> Seq.tryFind (fun interfase -> 
-      interfase.IsGenericType && interfase.GetGenericTypeDefinition() = typedefof<IList<_>>)
-    |> Option.map (fun interfase -> interfase.GetGenericArguments().[0] )
-
   let private handleProcedureParamAttr (prop: PropertyInfo) =
     match Attribute.GetCustomAttribute(prop, typeof<ProcedureParamAttribute>) with 
     | :? ProcedureParamAttribute as attr ->
@@ -436,14 +429,11 @@ module ProcedureParamMeta =
       | Direction.Output -> Output
       | Direction.ReturnValue -> ReturnValue
       | Direction.Result ->
-        Result
-        <| match typ with
-            | FSharpList elementType ->
-              (getElementCase elementType), (Seq.changeToList elementType)
-            | IList elementType ->
-              (getElementCase elementType), (Seq.changeToResizeArray elementType)
-            | _ ->
-            raise <| MetaException(SR.TRANQ3006 (typ.FullName, prop.Name))
+        match typ with
+        | FSharpList elementType ->
+          Result((getElementCase elementType), (Seq.changeToList elementType))
+        | _ ->
+          raise <| MetaException(SR.TRANQ3006 (typ.FullName, prop.Name))
       | _ -> failwith "unreachable."
 
   let make encloser index prop =

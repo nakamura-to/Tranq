@@ -80,10 +80,6 @@ module internal Seq =
           res <- e.Current :: res
       List.rev res
 
-  type private ToResizeArray =
-    static member Invoke<'T>(seq:seq<'T>) =
-      ResizeArray (seq)
-
   let private rethrow ex =
     let m = typeof<Exception>.GetMethod("PrepForRemoting", BindingFlags.NonPublic ||| BindingFlags.Instance)
     m.Invoke(ex, [||]) |> ignore
@@ -91,10 +87,10 @@ module internal Seq =
 
   let private changeTo (seq:seq<obj>) (elementTyp:Type) (helperType:Type) =
     let m = typeof<System.Linq.Enumerable>.GetMethod("Cast")
-    let m = m.MakeGenericMethod elementTyp
+    let m = m.MakeGenericMethod(elementTyp)
     let seq = m.Invoke(null, [| seq |])
     let m = helperType.GetMethod("Invoke", BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static)
-    let m = m.MakeGenericMethod (elementTyp)
+    let m = m.MakeGenericMethod(elementTyp)
     try
       m.Invoke(null, [| seq |])
     with
@@ -102,9 +98,6 @@ module internal Seq =
 
   let changeToList (elementTyp:Type) (seq:seq<obj>) =
     changeTo seq elementTyp typeof<ToList>
-
-  let changeToResizeArray (elementTyp:Type) (seq:seq<obj>) =
-    changeTo seq elementTyp typeof<ToResizeArray>
 
 module internal Option =
 
