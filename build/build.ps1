@@ -5,7 +5,6 @@ properties {
     $packageDir = "$workDir\package"
     $nugetDir = "$workDir\nuget"
     $nuspecFileName = "$nugetDir\Tranq.nuspec"
-    $releaseDir = "$projectDir\bin\Release"
     $assemblyFileName = "$baseDir\src\Tranq\AssemblyInfo.fs"
     $assemblyVersionNumber = "0.0.0.0"
 }
@@ -17,24 +16,21 @@ task ShowProperties {
     "`$buildDir = $buildDir"
     "`$assemblyFileName = $assemblyFileName"
     "`$workDir = $workDir"
-    "`$releaseDir = $releaseDir"
     "`$assemblyVersionNumber = $assemblyVersionNumber"
 }
 
 task Clean -depends ShowProperties {
-   Set-Location $baseDir
-   if (Test-Path -path $workDir)
-   {
+    Set-Location $baseDir
+    if (Test-Path -path $workDir)
+    {
         Write-Output -ForegroundColor Green "Deleting $workDir"    
         del $workDir -Recurse -Force
-   }
-   New-Item -Path $workDir -ItemType Directory
-   New-Item -Path $packageDir -ItemType Directory
-   New-Item -Path $nugetDir -ItemType Directory
-   New-Item -Path $nugetDir\lib -ItemType Directory
-   New-Item -Path $nugetDir\content -ItemType Directory
-   New-Item -Path $nugetDir\content\App_Readme -ItemType Directory
-   Copy-Item -Path $buildDir\Tranq.nuspec -Destination $nuspecFileName
+    }
+    New-Item -Path $workDir -ItemType Directory
+    New-Item -Path $packageDir -ItemType Directory
+    New-Item -Path $nugetDir -ItemType Directory
+    New-Item -Path $nugetDir\lib -ItemType Directory
+    Copy-Item -Path $buildDir\Tranq.nuspec -Destination $nuspecFileName
 }
 
 task UpdateVersion -depends Clean {
@@ -63,7 +59,7 @@ task Test -depends Build {
 task Package -depends Test {
     Write-Host -ForegroundColor Green "Packaging Tranq-$assemblyVersionNumber.zip"
     Write-Host
-    robocopy $workDir\Tranq $packageDir /MIR /NP
+    robocopy $workDir\Tranq $packageDir Tranq.* /MIR /NP
     exec { .\tools\7za920\7za.exe a -tzip $workDir\Tranq-$assemblyVersionNumber.zip $packageDir\* } "Error zipping"
 }
 
