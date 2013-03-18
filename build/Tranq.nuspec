@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>Tranq</id>
+    <version>0.0.0.0</version>
+    <authors>Toshihiro Nakamura</authors>
+    <owners>Toshihiro Nakamura</owners>
+    <licenseUrl>https://github.com/nakamura-to/Tranq/blob/master/LICENSE.txt</licenseUrl>
+    <projectUrl>https://github.com/nakamura-to/Tranq</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>F# TRANsaction Query executor</description>
+    <tags>orm sql db F# fsharp transaction ado.net</tags>
+    <dependencies>
+      <dependency id="FSPowerPack.Core.Community" version="3.0.0.0" />
+    </dependencies>
+    <frameworkAssemblies>
+      <frameworkAssembly assemblyName="System" targetFramework="net40" />
+      <frameworkAssembly assemblyName="System.Core" targetFramework="net40" />
+      <frameworkAssembly assemblyName="System.Data" targetFramework="net40" />
+      <frameworkAssembly assemblyName="System.Numerics" targetFramework="net40" />
+    </frameworkAssemblies>
+  </metadata>
+</package>
