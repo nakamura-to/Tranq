@@ -246,6 +246,16 @@ module Sql =
       | _ -> None
     |_ -> None
 
+  let internal bindVars (state : State) (ie:IEnumerable) =
+    let parameters = ie |> Seq.cast<obj> |> Seq.toList
+    if not parameters.IsEmpty then
+      state.AppendFragment "("
+      state.Bind(parameters.Head, (parameters.Head.GetType()))
+      Seq.iter (fun p -> 
+        state.AppendFragment ", "
+        state.Bind (p, p.GetType())) parameters.Tail
+      state.AppendFragment(")")
+
   let internal generate initState sql statement =
     let eval env expr loc =
       evaluate env expr loc sql
@@ -320,6 +330,17 @@ module Sql =
             state.AppendState childState
             state.AppendFragment ")"
         state
+      | BindVar(expr, loc) ->
+        let result, typ = eval state.Env expr loc
+        match result with
+        | :? string as s ->
+          state.Bind (s, typ)
+        | :? IEnumerable as ie -> 
+          bindVars state ie
+        | param -> 
+          state.Bind (param, typ)
+        state.IsAvailable <- true ;
+        state
       | BindVarComment(expr, _, loc) ->
         state.IsAvailable <- true ;
         state.Bind (eval state.Env expr loc)
@@ -327,15 +348,8 @@ module Sql =
       | BindVarsComment(expr, _, loc) ->
         let result, typ = eval state.Env expr loc
         match result with 
-        | :? IEnumerable as seq -> 
-          let parameters = seq |> Seq.cast<obj> |> Seq.toList
-          if not parameters.IsEmpty then
-            state.AppendFragment "("
-            state.Bind(parameters.Head, (parameters.Head.GetType()))
-            Seq.iter (fun p -> 
-              state.AppendFragment ", "
-              state.Bind (p, p.GetType())) parameters.Tail
-            state.AppendFragment(")")
+        | :? IEnumerable as ie -> 
+          bindVars state ie
         | param -> 
           state.Bind (param, typ)
         state.IsAvailable <- true
@@ -427,6 +441,8 @@ module Sql =
         buf
       | Parens(statement) ->
         SqlRewriteHelper.writeParens statement level buf visitStatement
+      | BindVar(expression, _) ->
+        buf.Append expression
       | BindVarComment(expression, node, _)
       | BindVarsComment(expression, node, _) ->
         SqlRewriteHelper.writeBindVarComment (expression, node) buf visitNode

@@ -405,6 +405,8 @@ type DialectBase(dataConvReg) as this =
         List.fold visitNode buf nodeList
       | Parens(statement) ->
         SqlRewriteHelper.writeParens statement level buf visitStatement
+      | BindVar(expression, _) ->
+        buf.Append expression
       | BindVarComment(expression, node, _)
       | BindVarsComment(expression, node, _) ->
         SqlRewriteHelper.writeBindVarComment (expression, node) buf visitNode
@@ -477,6 +479,8 @@ type DialectBase(dataConvReg) as this =
         List.fold visitNode buf nodeList
       | Parens(statement) ->
         SqlRewriteHelper.writeParens statement level buf visitStatement
+      | BindVar(expression, _) ->
+        buf.Append expression
       | BindVarComment(expression, node, _)
       | BindVarsComment(expression, node, _) ->
         SqlRewriteHelper.writeBindVarComment (expression, node) buf visitNode
@@ -667,6 +671,8 @@ type MsSqlDialect(?dataConvReg) =
         List.fold visitNode buf nodeList
       | Parens(statement) ->
         SqlRewriteHelper.writeParens statement level buf visitStatement
+      | BindVar(expression, _) ->
+        buf.Append expression
       | BindVarComment(expression, node, _)
       | BindVarsComment(expression, node, _) ->
         SqlRewriteHelper.writeBindVarComment (expression, node) buf visitNode

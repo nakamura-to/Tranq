@@ -144,7 +144,7 @@ module SqlTest =
   [<Test>]
   let ``parse At`` () =
     let test sql = 
-      match Sql.parse sql with SingleNode (BindVarComment _) -> () | x -> fail x
+      match Sql.parse sql with SingleNode (BindVar _) -> () | x -> fail x
     test "@name" 
 
   [<Test>]
@@ -460,7 +460,13 @@ module SqlTest =
     let list = [10; 20; 30]
     let ps = Sql.prepare dialect "select * from aaa where bbb in /*bbb*/(1,2,3)" [Param("bbb", list, typeof<int list>)]
     assert_equal "select * from aaa where bbb in (@p0, @p1, @p2)" ps.Text
-    
+
+  [<Test>]
+  let ``prepare : bind vars : at param`` () =
+    let list = [10; 20; 30]
+    let ps = Sql.prepare dialect "select * from aaa where bbb in @bbb" [Param("@bbb", list, typeof<int list>)]
+    assert_equal "select * from aaa where bbb in (@p0, @p1, @p2)" ps.Text
+
   [<Test>]
   let ``prepare : embedded var`` () =
     let ps = Sql.prepare dialect "select * from aaa /*# 'order by bbb' */" []

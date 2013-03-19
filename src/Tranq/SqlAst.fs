@@ -41,6 +41,7 @@ module SqlAst =
     | Other of string
     | BlockComment of string
     | LineComment of string
+    | BindVar of string * Location
     | BindVarComment of string * Node * Location
     | BindVarsComment of string * Node * Location
     | EmbeddedVarComment of string * Location
@@ -168,7 +169,7 @@ module SqlAst =
       LineComment (lineComment)
 
     let newBindVar parseState (at: string) (word: string) =
-      BindVarComment (at + word, Literal "", (getLocation parseState 1)) 
+      BindVar (at + word, (getLocation parseState 1)) 
 
     let newBindVarComment parseState (bindVarComment:string) node =
       let bindVarComment = bindVarComment.Trim()
