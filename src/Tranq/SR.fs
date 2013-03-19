@@ -17,13 +17,14 @@ open System.Globalization
 open System.Reflection
 open System.Resources
 
+/// Represents an error message
 type Message = 
   { Id : string;
     Text : string }
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Message =
+module internal Message =
   let format {Id = id; Text = text} = 
     "[" + id + "] " + text
 

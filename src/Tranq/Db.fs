@@ -25,6 +25,7 @@ open System.Text
 open Microsoft.FSharp.Reflection
 open Microsoft.FSharp.Text.Lexing
 
+/// Raised when an optimistic lock is conflicted
 exception OptimisticLockError of PreparedStatement with
   override this.Message =
     match this :> exn with
@@ -34,6 +35,7 @@ exception OptimisticLockError of PreparedStatement with
     | _ -> 
       Unchecked.defaultof<_>
 
+/// Raised when an unique constraint is violated
 exception UniqueConstraintError of PreparedStatement * string * exn with
   override this.Message =
     match this :> exn with
@@ -43,6 +45,7 @@ exception UniqueConstraintError of PreparedStatement * string * exn with
     | _ -> 
       Unchecked.defaultof<_>
 
+/// Raised when an entity is not found by the identifier
 exception EntityNotFoundError of PreparedStatement with
   override this.Message =
     match this :> exn with
@@ -52,6 +55,7 @@ exception EntityNotFoundError of PreparedStatement with
     | _ -> 
       Unchecked.defaultof<_>
 
+/// Raised when a DB related error is occurred
 type DbException (message, ?innerException:exn) =
   inherit InvalidOperationException (Message.format message, match innerException with Some ex -> ex | _ -> null)
   member this.MessageId = message.Id

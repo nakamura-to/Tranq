@@ -12,8 +12,10 @@
 
 namespace Tranq
 
+/// Used with parsing and lexing.
 module Text =
 
+  /// Represents a location in a text
   type Location = 
     { pos_fname : string; 
       pos_lnum : int; 

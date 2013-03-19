@@ -20,6 +20,7 @@ open System.Data.Common
 open System.Reflection
 open System.Text
 
+/// Indicates that a class is mapped to a table.
 [<AttributeUsage(AttributeTargets.Class)>]
 type TableAttribute() = 
   inherit Attribute()
@@ -29,6 +30,7 @@ type TableAttribute() =
   member val Name: string = null with get, set
   member val IsEnclosed = false with get, set
 
+/// Indicates that a property is mapped to a column.
 [<AttributeUsage(AttributeTargets.Property)>]
 type ColumnAttribute() = 
   inherit Attribute()
@@ -37,6 +39,7 @@ type ColumnAttribute() =
   member val Updatable = true with get, set
   member val IsEnclosed = false with get, set
 
+/// Indicates that a property is assigned by a database sequence.
 [<AttributeUsage(AttributeTargets.Property)>]
 type SequenceAttribute() = 
   inherit Attribute()
@@ -46,27 +49,37 @@ type SequenceAttribute() =
   member val IsEnclosed = false with get, set
   member val IncrementBy = 1 with get, set
 
+/// Defines the kinds of primary key columns.
 type IdKind =
+  /// The primary key is assigned by the application.
   | Assigned = 0
+  /// The primary key is assigned by the database identity feature.
   | Identity = 1
+  /// The primary key is assigned by the database sequence feature.
   | Sequence = 2
 
+/// Indicates that a property is mapped to a primary key column.
 [<AttributeUsage(AttributeTargets.Property)>]
 type IdAttribute(kind:IdKind) = 
   inherit Attribute()
   member val Kind = kind with get, set
   new () = new IdAttribute(IdKind.Assigned)
 
+/// Defines the kinds of version columns.
 type VersionKind =
+  // The version is incremented.
   | Incremented = 0
+  // The version is computed.
   | Computed = 1
 
+/// Indicates that a property is mapped to a version column which is used for optimistic lock.
 [<AttributeUsage(AttributeTargets.Property)>]
 type VersionAttribute(kind:VersionKind) = 
   inherit Attribute()
   member val Kind = kind with get, set
   new () = new VersionAttribute(VersionKind.Incremented)
 
+/// Indicates that a class is mapped to a stored procedure.
 [<AttributeUsage(AttributeTargets.Class)>]
 type ProcedureAttribute() = 
   inherit Attribute()
@@ -75,13 +88,20 @@ type ProcedureAttribute() =
   member val Name:string = null with get, set
   member val IsEnclosed = false with get, set
 
+/// Defines the kinds of stored procedure parameter directions.
 type Direction =
+  /// The parameter is an input parameter.
   | Input = 0
+  /// The parameter is capable of both input and output.
   | InputOutput = 1
+  /// The parameter is an output parameter.
   | Output = 2
+  /// The parameter represents a return value from an operation such as a stored procedure, built-in function, or user-defined function.
   | ReturnValue = 3
+  /// The parameter is a result set from an operation such as a stored procedure, built-in function, or user-defined function.
   | Result = 4
 
+/// Indicates that a property is mapped to a stored procedure parameter.
 [<AttributeUsage(AttributeTargets.Property)>]
 type ProcedureParamAttribute() = 
   inherit Attribute()
@@ -104,6 +124,7 @@ type ProcedureParamAttribute() =
   member this.PrecisionOpt = precisionOpt
   member this.ScaleOpt = scaleOpt
 
+/// Represents a ADO.NET SQL parameter.
 type PreparedParam =
   { Name : string
     Value : obj
@@ -117,15 +138,18 @@ type PreparedParam =
   override this.ToString() =
     string this.Value
 
+/// Represents a ADO.NET SQL statement.
 type PreparedStatement =
   { Text : string
     FormattedText : string
     Params : PreparedParam list }
 
+/// Represents a data converter.
 type IDataConv<'TRich, 'TBasic> = 
   abstract Compose : 'TBasic -> 'TRich
   abstract Decompose : 'TRich -> 'TBasic 
 
+/// Represents a data converte registry.
 type DataConvRegistry() =
   let dict = new ConcurrentDictionary<string, Type * (obj -> obj) * (obj -> obj)>()
   let key (typ: Type) = typ.FullName
@@ -154,6 +178,7 @@ type DataConvRegistry() =
   member this.TryGet<'TRich>() =
     this.TryGet(typeof<'TRich>)
 
+/// Represents a SQL dialect.
 type IDialect =
   abstract Name: string
   abstract DataConvRegistry: DataConvRegistry
@@ -184,26 +209,32 @@ type IDialect =
   abstract MakeParamDisposer: command:DbCommand -> IDisposable
   abstract ParseSql: text:string -> SqlAst.Statement
 
+/// Represents offset and limit.
 type Range(?Offset: int64, ?Limit: int64) =
   member this.Offset = defaultArg Offset 0L
   member this.Limit = defaultArg Limit -1L
 
+/// Represents insert options.
 type InsertOpt(?Exclude: string seq, ?Include: string seq, ?ExcludeNone: bool) =
   member this.Exclude = defaultArg Exclude Seq.empty
   member this.Include = defaultArg Include Seq.empty
   member this.ExcludeNone = defaultArg ExcludeNone false
 
+/// Represents update options.
 type UpdateOpt(?Exclude: string seq, ?Include: string seq, ?ExcludeNone: bool, ?IgnoreVersion: bool) =
   member this.Exclude = defaultArg Exclude Seq.empty
   member this.Include = defaultArg Include Seq.empty
   member this.ExcludeNone = defaultArg ExcludeNone false
   member this.IgnoreVersion = defaultArg IgnoreVersion false
 
+/// Represents delete options.
 type DeleteOpt(?IgnoreVersion: bool) =
   member this.IgnoreVersion = defaultArg IgnoreVersion false
 
+/// Represents a Tranq SQL parameter.
 type Param = Param of string * obj * Type
 
+/// Represents a SQL builer.
 type SqlBuilder(dialect:IDialect, ?capacity, ?paramNameSuffix) =
   let sql = StringBuilder(defaultArg capacity 200)
   let formattedSql = StringBuilder(defaultArg capacity 200)
@@ -246,29 +277,38 @@ type SqlBuilder(dialect:IDialect, ?capacity, ?paramNameSuffix) =
       FormattedText = formattedSql.ToString().Trim()
       Params = List.ofSeq parameters }
 
+/// Represents a transaction result.
 type TxResult<'R> = Success of 'R | Failure of exn
 
+/// Represents a transaction state.
 type TxState = { IsRollbackOnly: bool }
 
+/// Defines the kinds of transaction attributes.
 type TxAttr = Required | RequiresNew | Supports | NotSupported
 
+/// Defines the kinds of transaction isolation levels.
 type TxIsolationLevel = ReadUncommitted | ReadCommitted | RepeatableRead | Serializable | Snapshot
 
+/// Represents a transaction statte.
 type TxInfo = { LocalId: string; GlobalId: Guid }
 
+/// Defines the kinds of events.
 type TxEvent = 
   | TxBegun of TxInfo * TxAttr * TxIsolationLevel
   | TxCommitted of TxInfo * TxAttr * TxIsolationLevel
   | TxRolledback of TxInfo * TxAttr * TxIsolationLevel
   | SqlIssuing of TxInfo option * PreparedStatement
 
+/// Represents a transaction workflow
 type Tx<'R> = Tx of (TxContext -> TxResult<'R> * TxState)
- 
+
+/// Represents a transaction configuration.
 and TxConfig = {
   Dialect: IDialect
   ConnectionProvider: unit -> DbConnection
   Listener: TxEvent -> unit }
 
+/// Represents a transaction context.
 and TxContext = { 
   Config: TxConfig
   Connection: DbConnection
@@ -276,8 +316,10 @@ and TxContext = {
   TransactionInfo: TxInfo option
   State: TxState }
 
+/// Raised when a transaction is aborted explicitly
 exception AbortError of string
 
+/// Handles transaction workflows
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Tx =
@@ -351,6 +393,7 @@ module Tx =
   let exec config workflow = 
     run config workflow |> snd
 
+/// The transaction workflow builder.
 type TxBuilder(txAttr: TxAttr, txIsolatioinLevel: TxIsolationLevel) =
   let adoIsolationLevel = function
     | ReadUncommitted -> System.Data.IsolationLevel.ReadUncommitted

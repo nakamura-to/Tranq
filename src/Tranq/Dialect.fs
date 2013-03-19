@@ -107,6 +107,7 @@ module internal BuiltinFun =
       "infix", (box infix, infix.GetType())
       "suffix", (box suffix, suffix.GetType()) ]
 
+/// An abstract base class for IDialect implementations
 [<AbstractClass>]
 type DialectBase(dataConvReg) as this = 
 
@@ -555,6 +556,7 @@ type DialectBase(dataConvReg) as this =
     member this.MakeParamDisposer(command) = this.MakeParamDisposer(command)
     member this.ParseSql(text) = this.ParseSql(text)
 
+/// The dialect for Microsoft SQLServer 2008 and higher
 type MsSqlDialect(?dataConvReg) = 
   inherit DialectBase(defaultArg dataConvReg (DataConvRegistry()))
 
@@ -754,7 +756,7 @@ type MsSqlDialect(?dataConvReg) =
     | _ ->
       ()
 
-
+/// The dialect for Oracle Database 10g and higher.
 type OracleDialect(?dataConvReg) = 
   inherit DialectBase(defaultArg dataConvReg (DataConvRegistry()))
  
