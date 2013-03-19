@@ -276,11 +276,14 @@ and TxContext = {
   TransactionInfo: TxInfo option
   State: TxState }
 
-exception Abort of string
+exception AbortError of string
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Tx =
+
+  let internal runCore (Tx tx) ctx = 
+    tx ctx
 
   /// Marks a transaction as rollback only
   let rollbackOnly = Tx(fun _ -> Success (), { IsRollbackOnly = true })
@@ -292,17 +295,14 @@ module Tx =
   let inline abort e = Tx(fun {State = state} -> Failure e, state)
 
   /// Aborts a transaction with a message
-  let inline abortwith message = abort <| Abort message
+  let inline abortwith message = abort <| AbortError message
 
   /// Aborts a transaction with a format
   let inline abortwithf fmt  = Printf.ksprintf abortwith fmt
 
-  let runCore (Tx tx) ctx = 
-    tx ctx
-
   let inline returnM m = Tx(fun {State = state} -> Success m, state)
 
-  let inline bindM m f = Tx(fun ctx -> 
+  let bindM m f = Tx(fun ctx -> 
     match runCore m ctx with
     | Success out, state -> runCore (f out) {ctx with State = state}
     | Failure exn, state -> Failure exn, state)

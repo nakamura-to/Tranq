@@ -18,22 +18,22 @@ open System.Collections.Concurrent
 open System.Collections.Generic
 open Microsoft.FSharp.Reflection
 
-type SequenceMeta = 
+type internal SequenceMeta = 
   { SequenceName : string
     SqlSequenceName : string
     Generate : string -> (unit -> obj) -> int64 }
 
-type IdCase =
+type internal IdCase =
   | Assigned
   | Identity
   | Sequence of SequenceMeta
 
-type PropCase =
+type internal PropCase =
   | Id of IdCase
   | Version of VersionKind
   | Basic
 
-type PropMeta = 
+type internal PropMeta = 
   { Index : int
     PropName : string
     ColumnName : string
@@ -45,12 +45,12 @@ type PropMeta =
     Property : PropertyInfo
     GetValue : obj -> obj }
 
-type PreInsertCase =
+type internal PreInsertCase =
   | GetSequenceAndInitVersion of PropMeta * SequenceMeta * PropMeta
   | GetSequence of PropMeta * SequenceMeta
   | InitVersion of PropMeta
 
-type InsertCase =
+type internal InsertCase =
   | Insert_GetIdentityAndVersionAtOnce of PropMeta * PropMeta
   | Insert_GetIentityAtOnce of PropMeta
   | Insert_GetVersionAtOnce of PropMeta
@@ -59,13 +59,13 @@ type InsertCase =
   | Insert_GetVersionLater of PropMeta
   | Insert
 
-type UpdateCase =
+type internal UpdateCase =
   | Update_GetVersionAtOnce of PropMeta
   | Update_GetVersionLater of PropMeta
   | Update_IncrementVersion of PropMeta
   | Update
 
-type EntityMeta = 
+type internal EntityMeta = 
   { EntityName : string
     TableName : string
     SqlTableName : string
@@ -78,25 +78,25 @@ type EntityMeta =
     UpdateCase : UpdateCase
     MakeEntity : obj[] -> obj }
 
-type BasicElementMeta = 
+type internal BasicElementMeta = 
   { Index : int
     Type : Type }
 
-type EntityElementMeta = 
+type internal EntityElementMeta = 
   { Index : int
     EntityMeta : EntityMeta }
 
-type TupleMeta = 
+type internal TupleMeta = 
   { BasicElementMetaList : BasicElementMeta list
     EntityElementMetaList : EntityElementMeta list
     Type : Type
     MakeTuple : obj[] -> obj }
 
-type ResultElementCase =
+type internal ResultElementCase =
   | EntityType of EntityMeta
   | TupleType of TupleMeta
 
-type ParamMetaCase =
+type internal ParamMetaCase =
   | Unit
   | Input
   | InputOutput
@@ -104,7 +104,7 @@ type ParamMetaCase =
   | ReturnValue
   | Result of ResultElementCase * (seq<obj> -> obj)
 
-type ProcedureParamMeta =
+type internal ProcedureParamMeta =
   { Index : int
     ParamName : string 
     Type : Type
@@ -116,7 +116,7 @@ type ProcedureParamMeta =
     Property : PropertyInfo
     GetValue : obj -> obj }
 
-type ProcedureMeta =
+type internal ProcedureMeta =
   { ProcedureName : string
     SqlProcedureName : string
     ProcedureParamMetaList : ProcedureParamMeta list
@@ -175,7 +175,7 @@ module SequenceMeta =
       let context = contextCache.GetOrAdd(contextKey, generateExclusive (obj()))
       context executor 
     
-  let make simpleTableName dialect prop =
+  let internal make simpleTableName dialect prop =
     let sequenceName, enclosedSequenceName, isEnclosed, incrementBy = 
       handleSequenceAttr simpleTableName dialect prop
     { SequenceName = sequenceName 
@@ -213,7 +213,7 @@ module PropMeta =
       | _ ->
         PropCase.Basic
 
-  let make simpleTableName dialect index prop =
+  let internal make simpleTableName dialect index prop =
     let columnName, isInsertable, isUpdatable, isEnclosed = handleColumnAttr prop
     let propCase = getPropCase simpleTableName dialect prop
     { Index = index
@@ -357,7 +357,7 @@ module EntityMeta =
 
   let private cache = ConcurrentDictionary<Type * string, Lazy<EntityMeta>>()
 
-  let make typ (dialect: IDialect) =
+  let internal make typ (dialect: IDialect) =
     cache.GetOrAdd((typ, dialect.Name), Lazy(fun () -> makeInternal dialect typ))
     |> Lazy.force
 
@@ -391,7 +391,7 @@ module TupleMeta =
 
   let private cache = ConcurrentDictionary<Type * string, Lazy<TupleMeta>>()
   
-  let make typ (dialect: IDialect) =
+  let internal make typ (dialect: IDialect) =
     cache.GetOrAdd((typ, dialect.Name), Lazy(fun () -> makeInternal dialect typ))
     |> Lazy.force
 
@@ -436,7 +436,7 @@ module ProcedureParamMeta =
           raise <| MetaException(SR.TRANQ3006 (typ.FullName, prop.Name))
       | _ -> failwith "unreachable."
 
-  let make encloser index prop =
+  let internal make encloser index prop =
     let paramName, direction, size, precision, scale, udtTypeName = handleProcedureParamAttr prop
     let paramMetaCase = getParamMetaCase encloser prop direction
     { Index = index
@@ -452,7 +452,7 @@ module ProcedureParamMeta =
 
 [<RequireQualifiedAccess>]
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module ProcedureMeta =
+module internal ProcedureMeta =
 
   let private handleProcedureAttr dialect (typ:Type) =
     match Attribute.GetCustomAttribute(typ, typeof<ProcedureAttribute>) with 
@@ -481,6 +481,6 @@ module ProcedureMeta =
 
   let private cache = ConcurrentDictionary<Type * string, Lazy<ProcedureMeta>>()
 
-  let make typ (dialect: IDialect) =
+  let internal make typ (dialect: IDialect) =
     cache.GetOrAdd((typ, dialect.Name), Lazy(fun () -> makeInternal dialect typ))
     |> Lazy.force

@@ -22,6 +22,6 @@ open System.Runtime.CompilerServices;
 [<assembly:AssemblyProduct("Tranq")>]
 [<assembly:AssemblyVersion("0.1.0.0")>]
 
-[<assembly:InternalsVisibleTo("Tranq.Global")>]
+[<assembly:InternalsVisibleTo("Tranq.GlobalTx")>]
 [<assembly:InternalsVisibleTo("Tranq.Test")>]
 do()

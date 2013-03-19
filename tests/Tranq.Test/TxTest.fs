@@ -50,7 +50,7 @@ module TxTest =
     | Success ret, state -> failwith "not expected"
     | Failure ret, state -> 
       match ret with
-      | Abort m -> m |> assert_equal "hoge"
+      | AbortError m -> m |> assert_equal "hoge"
       | _ -> failwith "not expected"
 
   [<Test>]
@@ -63,7 +63,7 @@ module TxTest =
     | Success ret, state -> failwith "not expected"
     | Failure ret, state -> 
       match ret with
-      | Abort m -> m |> assert_equal "hoge 10"
+      | AbortError m -> m |> assert_equal "hoge 10"
       | _ -> failwith "not expected"
 
   [<Test>]

@@ -19,7 +19,7 @@ open Tranq.Text
 
 module internal ExprAst =
 
-  type Expr =
+  type internal Expr =
     | Factor of Factor
     | Add of Expr * Expr * Location
     | Sub of Expr * Expr * Location
@@ -39,7 +39,7 @@ module internal ExprAst =
     | Tuple of Factor list * Location
     | In of Factor * Expr * Location
 
-  and Factor =
+  and internal Factor =
     | Null
     | Unit
     | Boolean of bool

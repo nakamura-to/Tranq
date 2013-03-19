@@ -29,11 +29,13 @@ open Tranq.Text
 open Tranq.SqlAst
 open Tranq.SqlParser
 
-type SqlException (message, ?innerException:exn) =
+type internal SqlException (message, ?innerException:exn) =
   inherit InvalidOperationException (Message.format message, match innerException with Some ex -> ex | _ -> null)
   member this.MessageId = message.Id
 
-module RewriteHelper =
+[<RequireQualifiedAccess>]
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module SqlRewriteHelper =
   let writeIfComment ifComment (buf:StringBuilder) f = 
     match ifComment with
     | IfComment(expression, nodeList, _) ->
@@ -396,7 +398,7 @@ module Sql =
       | Statement nodeList -> 
         List.fold visitNode buf nodeList
       | Set(set, lhs, rhs, _) ->
-        RewriteHelper.writeSet (set, lhs, rhs) buf visitStatement
+        SqlRewriteHelper.writeSet (set, lhs, rhs) buf visitStatement
     and visitNode (buf:StringBuilder) =
       function
       | Word(fragment)
@@ -424,20 +426,20 @@ module Sql =
         insideOrderBy := false
         buf
       | Parens(statement) ->
-        RewriteHelper.writeParens statement level buf visitStatement
+        SqlRewriteHelper.writeParens statement level buf visitStatement
       | BindVarComment(expression, node, _)
       | BindVarsComment(expression, node, _) ->
-        RewriteHelper.writeBindVarComment (expression, node) buf visitNode
+        SqlRewriteHelper.writeBindVarComment (expression, node) buf visitNode
       | EmbeddedVarComment(expression, loc) ->
         if !insideOrderBy then
           let evalResult = evaluate env expression loc sql
           buf.Append (fst evalResult)
         else
-          RewriteHelper.writeEmbeddedVarComment expression buf
+          SqlRewriteHelper.writeEmbeddedVarComment expression buf
       | IfBlock(ifComment, elifCommentList, elseComment, nodeList) ->
-        RewriteHelper.writeIfBlock (ifComment, elifCommentList, elseComment, nodeList) buf visitNode
+        SqlRewriteHelper.writeIfBlock (ifComment, elifCommentList, elseComment, nodeList) buf visitNode
       | ForBlock(forComment, nodeList) -> 
-        RewriteHelper.writeForBlock (forComment, nodeList) buf visitNode
+        SqlRewriteHelper.writeForBlock (forComment, nodeList) buf visitNode
     let buf = visitStatement (StringBuilder(200)) statement
     buf.ToString()
 
@@ -454,11 +456,11 @@ module Sql =
       dict.[key] <- (value, typ) )
     dict
 
-  let prepare (dialect: IDialect) sql parameters =
+  let internal prepare (dialect: IDialect) sql parameters =
     let env = concatEnv dialect.Env (makeEnv parameters)
     prepareCore dialect sql env
 
-  let preparePaginate (dialect: IDialect) sql parameters (range: Range)  =
+  let internal preparePaginate (dialect: IDialect) sql parameters (range: Range)  =
     let statement = dialect.ParseSql sql
     let env = concatEnv dialect.Env (makeEnv parameters)
     let sql = resolveOrderByEmbeddedVariables sql env statement
@@ -467,7 +469,7 @@ module Sql =
     let env = concatEnv dialect.Env env
     prepareCore dialect sql env
 
-  let preparePaginateAndCount (dialect: IDialect) sql parameters (range: Range) =
+  let internal  preparePaginateAndCount (dialect: IDialect) sql parameters (range: Range) =
     let statement = dialect.ParseSql sql
     let env = concatEnv dialect.Env (makeEnv parameters)
     let sql = resolveOrderByEmbeddedVariables sql env statement
@@ -480,7 +482,7 @@ module Sql =
     let countPs = prepareCore dialect newSql newEnv
     paginatePs, countPs
 
-  let prepareFind (dialect: IDialect) (idList:obj list) (entityMeta:EntityMeta) =
+  let internal prepareFind (dialect: IDialect) (idList:obj list) (entityMeta:EntityMeta) =
     let buf = SqlBuilder(dialect)
     buf.Append("select ")
     entityMeta.PropMetaList 
@@ -516,7 +518,7 @@ module Sql =
     else
       not <| Seq.exists ((=) propName) exclud
 
-  let prepareInsert (dialect: IDialect) (entity:obj) (entityMeta:EntityMeta) (opt:InsertOpt) =
+  let internal prepareInsert (dialect: IDialect) (entity:obj) (entityMeta:EntityMeta) (opt:InsertOpt) =
     let propMetaSeq =
       entityMeta.PropMetaList
       |> Seq.filter (fun propMeta -> 
@@ -543,7 +545,7 @@ module Sql =
     buf.Append(" )")
     buf.Build()
 
-  let prepareUpdate (dialect: IDialect) (entity:obj) (entityMeta:EntityMeta) (opt:UpdateOpt) =
+  let internal prepareUpdate (dialect: IDialect) (entity:obj) (entityMeta:EntityMeta) (opt:UpdateOpt) =
     let incremetedVersion =
       entityMeta.VersionPropMeta
       |> Option.bind (fun propMeta -> 
@@ -594,7 +596,7 @@ module Sql =
         buf.Bind(propMeta.GetValue(entity), propMeta.Type) )
     buf.Build ()
 
-  let prepareDelete (dialect: IDialect) (entity:obj) (entityMeta:EntityMeta) (opt:DeleteOpt) =
+  let internal prepareDelete (dialect: IDialect) (entity:obj) (entityMeta:EntityMeta) (opt:DeleteOpt) =
     let buf = SqlBuilder(dialect)
     buf.Append("delete from ")
     buf.Append(entityMeta.SqlTableName)
@@ -615,7 +617,7 @@ module Sql =
         buf.Bind(propMeta.GetValue(entity), propMeta.Type) )
     buf.Build ()
 
-  let prepareCall (dialect: IDialect) procedure (procedureMeta:ProcedureMeta) =
+  let internal prepareCall (dialect: IDialect) procedure (procedureMeta:ProcedureMeta) =
     let getDirection = function
       | Input -> Direction.Input
       | InputOutput -> Direction.InputOutput

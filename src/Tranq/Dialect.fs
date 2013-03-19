@@ -362,7 +362,7 @@ type DialectBase(dataConvReg) as this =
       | Statement nodeList -> 
         List.fold visitNode buf nodeList
       | Set(set, lhs, rhs, _) ->
-        RewriteHelper.writeSet (set, lhs, rhs) buf visitStatement
+        SqlRewriteHelper.writeSet (set, lhs, rhs) buf visitStatement
     and visitNode (buf:StringBuilder) =
       function
       | Word(fragment) ->
@@ -403,16 +403,16 @@ type DialectBase(dataConvReg) as this =
         buf.Append keyword |> ignore
         List.fold visitNode buf nodeList
       | Parens(statement) ->
-        RewriteHelper.writeParens statement level buf visitStatement
+        SqlRewriteHelper.writeParens statement level buf visitStatement
       | BindVarComment(expression, node, _)
       | BindVarsComment(expression, node, _) ->
-        RewriteHelper.writeBindVarComment (expression, node) buf visitNode
+        SqlRewriteHelper.writeBindVarComment (expression, node) buf visitNode
       | EmbeddedVarComment(expression, _)->
-        RewriteHelper.writeEmbeddedVarComment expression buf
+        SqlRewriteHelper.writeEmbeddedVarComment expression buf
       | IfBlock(ifComment, elifCommentList, elseComment, nodeList) ->
-        RewriteHelper.writeIfBlock (ifComment, elifCommentList, elseComment, nodeList) buf visitNode
+        SqlRewriteHelper.writeIfBlock (ifComment, elifCommentList, elseComment, nodeList) buf visitNode
       | ForBlock(forComment, nodeList) -> 
-        RewriteHelper.writeForBlock (forComment, nodeList) buf visitNode
+        SqlRewriteHelper.writeForBlock (forComment, nodeList) buf visitNode
     let subqueryBuf = visitStatement (StringBuilder(200)) statement
     if orderByBuf.Length = 0 then
       let message = Sql.appendSimpleDetail (SR.TRANQ2016 ()) sql
@@ -447,7 +447,7 @@ type DialectBase(dataConvReg) as this =
       | Statement nodeList -> 
         List.fold visitNode buf nodeList
       | Set(set, lhs, rhs, _) ->
-        RewriteHelper.writeSet (set, lhs, rhs) buf visitStatement
+        SqlRewriteHelper.writeSet (set, lhs, rhs) buf visitStatement
     and visitNode buf =
       function
       | Word(fragment)
@@ -475,16 +475,16 @@ type DialectBase(dataConvReg) as this =
         buf.Append keyword |> ignore
         List.fold visitNode buf nodeList
       | Parens(statement) ->
-        RewriteHelper.writeParens statement level buf visitStatement
+        SqlRewriteHelper.writeParens statement level buf visitStatement
       | BindVarComment(expression, node, _)
       | BindVarsComment(expression, node, _) ->
-        RewriteHelper.writeBindVarComment (expression, node) buf visitNode
+        SqlRewriteHelper.writeBindVarComment (expression, node) buf visitNode
       | EmbeddedVarComment(expression, _)->
-        RewriteHelper.writeEmbeddedVarComment expression buf
+        SqlRewriteHelper.writeEmbeddedVarComment expression buf
       | IfBlock(ifComment, elifCommentList, elseComment, nodeList) ->
-        RewriteHelper.writeIfBlock (ifComment, elifCommentList, elseComment, nodeList) buf visitNode
+        SqlRewriteHelper.writeIfBlock (ifComment, elifCommentList, elseComment, nodeList) buf visitNode
       | ForBlock(forComment, nodeList) -> 
-        RewriteHelper.writeForBlock (forComment, nodeList) buf visitNode
+        SqlRewriteHelper.writeForBlock (forComment, nodeList) buf visitNode
     let buf = visitStatement (StringBuilder(200)) statement
     buf.Insert(0, "select " + this.CountFunction + "(*) from ( ") |> ignore
     buf.Append " ) t_" |> ignore
@@ -634,7 +634,7 @@ type MsSqlDialect(?dataConvReg) =
       | Statement nodeList -> 
         List.fold visitNode buf nodeList
       | Set(set, lhs, rhs, _) ->
-        RewriteHelper.writeSet (set, lhs, rhs) buf visitStatement
+        SqlRewriteHelper.writeSet (set, lhs, rhs) buf visitStatement
     and visitNode buf =
       function
       | Word(fragment)
@@ -664,16 +664,16 @@ type MsSqlDialect(?dataConvReg) =
         let buf = buf.Append keyword
         List.fold visitNode buf nodeList
       | Parens(statement) ->
-        RewriteHelper.writeParens statement level buf visitStatement
+        SqlRewriteHelper.writeParens statement level buf visitStatement
       | BindVarComment(expression, node, _)
       | BindVarsComment(expression, node, _) ->
-        RewriteHelper.writeBindVarComment (expression, node) buf visitNode
+        SqlRewriteHelper.writeBindVarComment (expression, node) buf visitNode
       | EmbeddedVarComment(expression, _)->
-        RewriteHelper.writeEmbeddedVarComment expression buf
+        SqlRewriteHelper.writeEmbeddedVarComment expression buf
       | IfBlock(ifComment, elifCommentList, elseComment, nodeList) ->
-        RewriteHelper.writeIfBlock (ifComment, elifCommentList, elseComment, nodeList) buf visitNode
+        SqlRewriteHelper.writeIfBlock (ifComment, elifCommentList, elseComment, nodeList) buf visitNode
       | ForBlock(forComment, nodeList) -> 
-        RewriteHelper.writeForBlock (forComment, nodeList) buf visitNode
+        SqlRewriteHelper.writeForBlock (forComment, nodeList) buf visitNode
     let buf = visitStatement (StringBuilder(200) )statement
     let exprCtxt = Dictionary<string, obj * Type>(exprCtxt) :> IDictionary<string, obj * Type>
     exprCtxt.["tranq_limit"] <- (box limit, typeof<int>)
