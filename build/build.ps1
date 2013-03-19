@@ -2,10 +2,12 @@ properties {
     $baseDir  = resolve-path ..
     $buildDir = "$baseDir\build"
     $workDir = "$buildDir\work"
-    $packageDir = "$workDir\package"
-    $nugetDir = "$workDir\nuget"
+    $nugetDir = "$workDir\nuget.Tranq"
+    $gtx_nugetDir = "$workDir\nuget.Tranq.GlobalTx"
     $nuspecFileName = "$nugetDir\Tranq.nuspec"
+    $gtx_nuspecFileName = "$gtx_nugetDir\Tranq.GlobalTx.nuspec"
     $assemblyFileName = "$baseDir\src\Tranq\AssemblyInfo.fs"
+    $gtx_assemblyFileName = "$baseDir\src\Tranq.GlobalTx\AssemblyInfo.fs"
     $assemblyVersionNumber = "0.0.0.0"
 }
 
@@ -15,6 +17,7 @@ task ShowProperties {
     "`$baseDir = $baseDir"
     "`$buildDir = $buildDir"
     "`$assemblyFileName = $assemblyFileName"
+    "`$gtx_assemblyFileName = $gtx_assemblyFileName"
     "`$workDir = $workDir"
     "`$assemblyVersionNumber = $assemblyVersionNumber"
 }
@@ -27,13 +30,15 @@ task Clean -depends ShowProperties {
         del $workDir -Recurse -Force
     }
     New-Item -Path $workDir -ItemType Directory
-    New-Item -Path $packageDir -ItemType Directory
     New-Item -Path $nugetDir -ItemType Directory
+    New-Item -Path $gtx_nugetDir -ItemType Directory
     New-Item -Path $nugetDir\lib -ItemType Directory
+    New-Item -Path $gtx_nugetDir\lib -ItemType Directory
     Copy-Item -Path $buildDir\Tranq.nuspec -Destination $nuspecFileName
+    Copy-Item -Path $buildDir\Tranq.GlobalTx.nuspec -Destination $gtx_nuspecFileName
 }
 
-task UpdateVersion -depends Clean {
+function replaceVersion($assemblyFileName, $nuspecFileName) {
     $assemblyVersionPattern = 'AssemblyVersion\("[0-9]+(\.([0-9]+|\*)){1,3}"\)'
     $assemblyVersion = 'AssemblyVersion("' + $assemblyVersionNumber + '")';
     (Get-Content $assemblyFileName) -replace $assemblyVersionPattern, $assemblyVersion | Set-Content $assemblyFileName
@@ -41,32 +46,33 @@ task UpdateVersion -depends Clean {
     $nuspecVersionPattern = '<version>[0-9]+(\.([0-9]+|\*)){1,3}</version>'
     $nuspecVersion = "<version>$assemblyVersionNumber</version>";
     (Get-Content $nuspecFileName) -replace $nuspecVersionPattern, $nuspecVersion | Set-Content $nuspecFileName
+
+    $nuspecDependencyVersionPattern = '<dependency id="Tranq" version="[0-9]+(\.([0-9]+|\*)){1,3}" />'
+    $nuspecDependencyVersion = "<dependency id=`"Tranq`" version=`"$assemblyVersionNumber`" />";
+    (Get-Content $nuspecFileName) -replace $nuspecDependencyVersionPattern, $nuspecDependencyVersion | Set-Content $nuspecFileName
 }
 
-task Build -depends UpdateVersion {
-    Write-Host -ForegroundColor Green "Building"
-    Write-Host
-    exec { msbuild "/t:Clean;Rebuild" /p:Configuration=Release /p:OutputPath=$workDir\Tranq "$baseDir\src\Tranq\Tranq.fsproj" } "Error Build"
+task UpdateVersion -depends Clean {
+    replaceVersion $assemblyFileName $nuspecFileName
+    replaceVersion $gtx_assemblyFileName $gtx_nuspecFileName
 }
 
-task Test -depends Build {
+task BuildAndTest -depends UpdateVersion {
     Write-Host -ForegroundColor Green "Testing"
     Write-Host
     exec { msbuild "/t:Clean;Rebuild" /p:Configuration=Release /p:OutputPath=$workDir\Tranq.Test "$baseDir\tests\Tranq.Test\Tranq.Test.fsproj" } "Error Build"
     exec { .\tools\NUnit-2.6.2\bin\nunit-console.exe "$workDir\Tranq.Test\Tranq.Test.dll" /framework=$framework /xml:$workDir\Tranq.Test\testResult.xml } "Error running $name tests" 
 }
 
-task Package -depends Test {
-    Write-Host -ForegroundColor Green "Packaging Tranq-$assemblyVersionNumber.zip"
-    Write-Host
-    robocopy $workDir\Tranq $packageDir Tranq.* /MIR /NP
-    exec { .\tools\7za920\7za.exe a -tzip $workDir\Tranq-$assemblyVersionNumber.zip $packageDir\* } "Error zipping"
-}
-
-task NuGet -depends Package {
+task NuGet -depends BuildAndTest {
     Write-Host -ForegroundColor Green "NuGet"
     Write-Host
-    Copy-Item -Path $packageDir -Destination $nugetDir\lib\Net40 -recurse
+
+    robocopy $workDir\Tranq.Test $nugetDir\lib\Net40 Tranq.dll Tranq.pdb Tranq.xml FSharp.PowerPack.* /MIR /NP
     exec { .\tools\NuGet\NuGet.exe pack $nuspecFileName }
+
+    robocopy $workDir\Tranq.Test $gtx_nugetDir\lib\Net40 Tranq.GlobalTx.dll Tranq.GlobalTx.pdb Tranq.GlobalTx.xml /MIR /NP
+    exec { .\tools\NuGet\NuGet.exe pack $gtx_nuspecFileName }
+
     move -Path .\*.nupkg -Destination $workDir
 }

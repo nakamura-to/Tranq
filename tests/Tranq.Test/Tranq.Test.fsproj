@@ -48,6 +48,7 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.Numerics" />
+    <Reference Include="System.Transactions" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="TestTool.fs" />
@@ -58,9 +59,15 @@
     <Compile Include="SqlTest.fs" />
     <Compile Include="DbTest.fs" />
     <Compile Include="TxTest.fs" />
+    <Compile Include="GlobalTxTest.fs" />
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Tranq.GlobalTx\Tranq.GlobalTx.fsproj">
+      <Name>Tranq.GlobalTx</Name>
+      <Project>{fcf7b9ae-b345-4836-81da-eedd95790724}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\..\src\Tranq\Tranq.fsproj">
       <Name>Tranq</Name>
       <Project>{f1e3515e-e90f-4a4b-ba31-f3f88e82a99d}</Project>

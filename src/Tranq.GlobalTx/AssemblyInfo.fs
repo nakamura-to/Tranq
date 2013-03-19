@@ -15,13 +15,11 @@ namespace Tranq
 open System.Reflection
 open System.Runtime.CompilerServices;
 
-[<assembly:AssemblyDescription("Tranq.dll")>]
+[<assembly:AssemblyDescription("Tranq.GlobalTx.dll")>]
 [<assembly:AssemblyCompany("https://github.com/nakamura-to/Tranq")>]
-[<assembly:AssemblyTitle("Tranq.dll")>]
+[<assembly:AssemblyTitle("Tranq.Global.dll")>]
 [<assembly:AssemblyCopyright("Copyright the Tranq Team. All rights reserved.")>]
-[<assembly:AssemblyProduct("Tranq")>]
+[<assembly:AssemblyProduct("Tranq.GlobalTx")>]
 [<assembly:AssemblyVersion("0.1.0.0")>]
 
-[<assembly:InternalsVisibleTo("Tranq.Global")>]
-[<assembly:InternalsVisibleTo("Tranq.Test")>]
 do()
