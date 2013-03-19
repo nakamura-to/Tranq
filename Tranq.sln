@@ -9,6 +9,11 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.Test", "tests\Tranq.T
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Tranq.Test.Console", "tests\Tranq.Test.Console\Tranq.Test.Console.fsproj", "{1C4F74EB-A174-41E8-AD89-AD386AF7654D}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "readme", "readme", "{3CBB8157-1D1E-47F1-98B8-40CD05FB83E7}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
