@@ -2,11 +2,11 @@
 
 ## Create a F# Application Project
 
-In Visual Stuido, create a F# application project.
+In Visual Stuido, create a new F# application project.
 
 ## Install Tranq with Nuget
 
-Install the `Tranq` library into your project.
+Install the `Tranq` library into the project.
 
 ```
 PM> Install-Package Tranq
@@ -14,84 +14,46 @@ PM> Install-Package Tranq
 
 ## Make a Database Table
 
-In this example, we use `tempdb`.
+In this example, we use SQL Server 2012 Express.
 
-Create a table and insert data.
+Create a table in tempdb and insert data.
 
 ```sql
 use tempdb;
+if exists (select * from dbo.sysobjects where id = object_id(N'Person')) drop table Person;
 create table Person (Id int primary key, Name varchar(50), Age int);
 insert Person (Id, Name, Age) values (1, 'hoge', 10);
 ```
 
 ## Write Code
 
-### Open Tranq namespace
-
-```fsharp
-open Tranq
-```
-
-### Define a Record Type
-
-```fsharp
-type Person = { [<Id>]Id: int; Name: string; Age: int }
-```
-Specify `Tranq.IdAttribute` to the identifier field.
-
-### Define Transaction Workflow
-
-```fsharp
-let workflow = txRequired {
-  let! person = Db.find<Person> [1]
-  return! Db.update { person with Age = person.Age + 1 }}
-```
-
-Find a row and update it.
-
-### Define a Configuration
-
-```fsharp
-let config =
-  let provide() =
-    let conStr = "Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;" 
-    new System.Data.SqlClient.SqlConnection(conStr) :> System.Data.Common.DbConnection
-  let log = function
-    | SqlIssuing(_, stmt) -> printfn "LOG: %s" stmt.FormattedText
-    |_ -> ()
-  { Dialect = MsSqlDialect(); ConnectionProvider = provide; Listener = log }
-```
-
-### Evaluate a workflow
-
-Evaluate the workflow and get a result.
-
-```fsharp
-Tx.eval config workflow |> function
-| Success ret -> printfn "success: %A\n" ret
-| Failure exn -> printfn "failure: %A\n" exn
-```
-
-### Entire Source Code
+Open a Program.fs file and paste following code.
 
 ```fsharp
 open Tranq
 
+// This is mapped to a Database Person Table.
+// Tranq.IdAttribute is required to the identifier field.
 type Person = { [<Id>]Id: int; Name: string; Age: int }
 
+// transaction workflow
 let workflow = txRequired {
+  // find by identifier
   let! person = Db.find<Person> [1]
+  // update
   return! Db.update { person with Age = person.Age + 1 }}
 
+// Tranq configuration
 let config =
   let provide() =
-    let conStr = "Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;" 
-    new System.Data.SqlClient.SqlConnection(conStr) :> System.Data.Common.DbConnection
+    let connectionString = "Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;" 
+    new System.Data.SqlClient.SqlConnection(connectionString) :> System.Data.Common.DbConnection
   let log = function
     | SqlIssuing(_, stmt) -> printfn "LOG: %s" stmt.FormattedText
     |_ -> ()
   { Dialect = MsSqlDialect(); ConnectionProvider = provide; Listener = log }
 
+// evaluate the transaction workflow and get a result
 Tx.eval config workflow |> function
 | Success ret -> printfn "success: %A\n" ret
 | Failure exn -> printfn "failure: %A\n" exn
