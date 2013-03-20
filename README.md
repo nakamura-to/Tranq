@@ -206,6 +206,10 @@ If the name parameter is `None`, SQL is built as follows
 select * from Person
 ```
 
+## Resources
+
+- [QuickStart.md](QuickStart.md)
+
 ## License
 
 Apache License, Version 2.0
