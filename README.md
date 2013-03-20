@@ -50,12 +50,12 @@ The `txRequired` means that the expression is always executed in a transaction.
 Other than `txRequired`, following keywords are available
 
 - txRequiresNew - the expression is always executed in a NEW transaction
-- txSupports - the expression adopt the exact transactional state of the caller
+- txSupports - the expression adopts the exact transactional state of the caller
 - txNotSupported - the expression never be executed in a transaction
 
 ## Rich Type Mappings
 
-You can map a Database column value to a discriminated union using `IDataConv` interface.
+You can map a Database column value to a discriminated union value using `IDataConv` interface.
 
 ```fsharp
 type Name = Name of string
