@@ -5,10 +5,10 @@
     <version>0.0.0.0</version>
     <authors>Toshihiro Nakamura</authors>
     <owners>Toshihiro Nakamura</owners>
-    <licenseUrl>https://github.com/nakamura-to/Tranq/blob/master/LICENSE.txt</licenseUrl>
+    <licenseUrl>http://www.apache.org/licenses/LICENSE-2.0.html</licenseUrl>
     <projectUrl>https://github.com/nakamura-to/Tranq</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <description>F# TRANsaction Query executor for Global Transactions</description>
+    <description>F# DB Access Library for Global Transactions</description>
     <tags>orm sql db F# fsharp transaction ado.net</tags>
     <dependencies>
       <dependency id="Tranq" version="0.0.0.0" />
