@@ -26,23 +26,28 @@ module internal BuiltinFun =
 
   let isNone (obj:obj) = obj = null
 
-  let isNoneOrEmpty (obj:obj) = 
+  let isEmpty (obj:obj) =
     match obj with
-    | :? string as x -> 
-      String.IsNullOrEmpty(x)
-    | :? option<string> as x-> 
-      match x with None -> true | Some x -> String.IsNullOrEmpty(x)
+    | :? IEnumerable as x -> 
+      x |> Seq.cast<obj> |> Seq.isEmpty
+    | x when x <> null && Type.isOption (x.GetType()) ->
+      let element, _ = Option.getElement (x.GetType()) x
+      match element with
+      | :? IEnumerable as x -> 
+        x |> Seq.cast<obj> |> Seq.isEmpty
+      | _ ->
+        false
     | _ -> 
-      if obj = null then true else String.IsNullOrEmpty(string obj)
+      false
 
-  let isNoneOrWhiteSpace (obj:obj) = 
+  let isWhiteSpace (obj:obj) = 
     match obj with
     | :? string as x -> 
       String.IsNullOrWhiteSpace(x)
     | :? option<string> as x-> 
-      match x with None -> true | Some x -> String.IsNullOrWhiteSpace(x)
+      match x with None -> false | Some x -> String.IsNullOrWhiteSpace(x)
     | _ -> 
-      if obj = null then true else String.IsNullOrWhiteSpace(string obj)
+      false
 
   let date (obj:obj) = 
     match obj with
@@ -97,8 +102,8 @@ module internal BuiltinFun =
     dict [
       "isSome", (box isSome, isSome.GetType())
       "isNone", (box isNone, isNone.GetType())
-      "isNoneOrEmpty", (box isNoneOrEmpty, isNoneOrEmpty.GetType())
-      "isNoneOrWhiteSpace", (box isNoneOrWhiteSpace, isNoneOrWhiteSpace.GetType())
+      "isEmpty", (box isEmpty, isEmpty.GetType())
+      "isWhiteSpace", (box isWhiteSpace, isWhiteSpace.GetType())
       "date", (box date, date.GetType())
       "nextDate", (box nextDate, nextDate.GetType())
       "prevDate", (box prevDate, prevDate.GetType())

@@ -337,6 +337,13 @@ module Sql =
           state.Bind (s, typ)
         | :? IEnumerable as ie -> 
           bindVars state ie
+        | x when x <> null && Type.isOption (x.GetType()) -> 
+          let element, _ = Option.getElement (x.GetType()) x
+          match element with
+          | :? IEnumerable as ie -> 
+            bindVars state ie
+          | _ -> 
+            state.Bind (x, typ)
         | param -> 
           state.Bind (param, typ)
         state.IsAvailable <- true ;
@@ -350,6 +357,13 @@ module Sql =
         match result with 
         | :? IEnumerable as ie -> 
           bindVars state ie
+        | x when x <> null && Type.isOption (x.GetType()) -> 
+          let element, _ = Option.getElement (x.GetType()) x
+          match element with
+          | :? IEnumerable as ie -> 
+            bindVars state ie
+          | _ -> 
+            state.Bind (x, typ)
         | param -> 
           state.Bind (param, typ)
         state.IsAvailable <- true
