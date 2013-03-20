@@ -23,7 +23,6 @@ let workflow = txRequired {
       create table Person (Id int primary key, Email varchar(50), Age int, Version int);
       " []
   do! Db.insert<Person> {Id = 1; Email = "hoge@example.com"; Age = Some 20; Version = 0} |> Tx.ignore
-  // abort
   do! Tx.abort <| new System.Exception("somethig wrong")
   let! person = Db.find<Person> [1]
   let! person = Db.update<Person> { person with Email = "hoge@sample.com" }

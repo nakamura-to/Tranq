@@ -44,9 +44,10 @@
     <None Include="abort.fsx" />
     <None Include="abortwith.fsx" />
     <None Include="rollbackonly.fsx" />
+    <None Include="query.fsx" />
     <None Include="pagination.fsx" />
     <None Include="crud.fsx" />
-    <None Include="App.config" />
+    <None Include="mapM.fsx" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
@@ -57,10 +58,6 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.Numerics" />
-    <Reference Include="System.Transactions" />
-    <Reference Include="Tranq.Global">
-      <HintPath>lib\Tranq.Global.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -28,7 +28,6 @@ let workflow = txRequired {
       insert Person (Id, Email, Age, Version) values (4, 'fuga@example.com', 40, 0);
       insert Person (Id, Email, Age, Version) values (5, 'piyo@example.com', 50, 0);
       " []
-  // paginate
   return! Db.paginate<Person> "
     select * from Person order by Id
     " [] (Range(Offset = 1L, Limit = 2L)) }

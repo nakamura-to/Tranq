@@ -24,7 +24,6 @@ let workflow = txRequired {
       " []
   do! Db.insert<Person> {Id = 1; Email = "hoge@example.com"; Age = Some 20; Version = 0} |> Tx.ignore
   let! person = Db.find<Person> [1]
-  // rollback only
   do! Tx.rollbackOnly
   let! person = Db.update<Person> { person with Email = "hoge@sample.com" }
   do! Db.delete<Person> person }
