@@ -10,6 +10,9 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>F# DB Access Library</description>
     <tags>orm sql db F# fsharp transaction ado.net</tags>
+    <dependencies>
+      <dependency id="FSPowerPack.Core.Community" version="3.0.0.0" />
+    </dependencies>
     <frameworkAssemblies>
       <frameworkAssembly assemblyName="System" targetFramework="net40" />
       <frameworkAssembly assemblyName="System.Core" targetFramework="net40" />

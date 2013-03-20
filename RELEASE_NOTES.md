@@ -1,1 +1,2 @@
 - 0.1.0.0 Initial release.
+- 0.1.0.1 Use latest FSPowerPack.Core.Community

@@ -20,6 +20,6 @@ open System.Runtime.CompilerServices;
 [<assembly:AssemblyTitle("Tranq.Global.dll")>]
 [<assembly:AssemblyCopyright("Copyright the Tranq Team. All rights reserved.")>]
 [<assembly:AssemblyProduct("Tranq.GlobalTx")>]
-[<assembly:AssemblyVersion("0.1.0.0")>]
+[<assembly:AssemblyVersion("0.1.0.1")>]
 
 do()

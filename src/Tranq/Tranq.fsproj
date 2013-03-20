@@ -71,10 +71,11 @@
     <Compile Include="Db.fs" />
     <Compile Include="AssemblyInfo.fs" />
     <EmbeddedResource Include="Resource.resx" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.PowerPack">
-      <HintPath>..\..\tools\FSharpPowerPack-4.0.0.0\bin\FSharp.PowerPack.dll</HintPath>
+      <HintPath>..\..\packages\FSPowerPack.Core.Community.3.0.0.0\Lib\Net40\FSharp.PowerPack.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core, Version=4.3.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
@@ -96,8 +97,8 @@
       <!----></PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>copy /y $(TargetDir) /b $(ProjectDir)..\..\samples\Tranq.Sample\lib /b
-copy /y $(TargetDir) /b $(ProjectDir)..\..\tests\Tranq.Test.MsSql\lib /b</PostBuildEvent>
+    <PostBuildEvent>copy /y $(TargetDir)Tranq.* /b $(ProjectDir)..\..\samples\Tranq.Sample\lib /b
+copy /y $(TargetDir)Tranq.* /b $(ProjectDir)..\..\tests\Tranq.Test.MsSql\lib /b</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

@@ -68,10 +68,10 @@ task NuGet -depends BuildAndTest {
     Write-Host -ForegroundColor Green "NuGet"
     Write-Host
 
-    robocopy $workDir\Tranq.Test $nugetDir\lib\Net40 Tranq.dll Tranq.pdb Tranq.xml FSharp.PowerPack.* /MIR /NP
+    robocopy $workDir\Tranq.Test $nugetDir\lib\Net40 Tranq.dll Tranq.xml /MIR /NP
     exec { .\tools\NuGet\NuGet.exe pack $nuspecFileName }
 
-    robocopy $workDir\Tranq.Test $gtx_nugetDir\lib\Net40 Tranq.GlobalTx.dll Tranq.GlobalTx.pdb Tranq.GlobalTx.xml /MIR /NP
+    robocopy $workDir\Tranq.Test $gtx_nugetDir\lib\Net40 Tranq.GlobalTx.dll Tranq.GlobalTx.xml /MIR /NP
     exec { .\tools\NuGet\NuGet.exe pack $gtx_nuspecFileName }
 
     move -Path .\*.nupkg -Destination $workDir
