@@ -38,7 +38,7 @@ type Person = { [<Id>]Id: int; Name: string; Age: int }
 
 let workflow = txRequired {
   let! person = Db.find<Person> [1]
-  Db.update { person with Age = person.Age + 1 }}
+  return! Db.update { person with Age = person.Age + 1 }}
 
 Tx.eval config workflow |> function
 | Success ret -> printfn "success: %A\n" ret
