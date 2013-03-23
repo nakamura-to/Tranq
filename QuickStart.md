@@ -12,7 +12,7 @@ Install the `Tranq` library into the project.
 PM> Install-Package Tranq
 ```
 
-## Make a Database Table
+## Create a Database Table
 
 In this example, we use SQL Server 2012 Express.
 
