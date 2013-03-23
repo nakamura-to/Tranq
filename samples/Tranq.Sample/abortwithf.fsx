@@ -12,8 +12,8 @@ let workflow = txRequired {
       create table Person (Id int primary key, Email varchar(50), Age int, Version int);
       " []
   do! Db.insert<Person> {Id = 1; Email = "hoge@example.com"; Age = Some 20; Version = 0} |> Tx.ignore
+  do! Tx.abortwithf "somethig wrong %d %s" 10 "hoge"
   let! person = Db.find<Person> [1]
-  do! Tx.rollbackOnly
   let! person = Db.update<Person> { person with Email = "hoge@sample.com" }
   do! Db.delete<Person> person }
 

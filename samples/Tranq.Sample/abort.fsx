@@ -1,22 +1,11 @@
 ﻿#r @"..\..\packages\FSPowerPack.Core.Community.3.0.0.0\Lib\Net40\FSharp.PowerPack.dll"
 #r @"lib\Tranq.dll"
+#load @"util.fsx"
 
 open Tranq
 
-// entity
 type Person = { [<Id>]Id: int; Email: string; Age: int option; [<Version>]Version: int }
 
-// configuration
-let config =
-  let provide() =
-    let conStr = "Data Source=.\SQLEXPRESS;Initial Catalog=tempdb;Integrated Security=True;" 
-    new System.Data.SqlClient.SqlConnection(conStr) :> System.Data.Common.DbConnection
-  let log = function
-    | SqlIssuing(_, stmt) -> printfn "LOG: %s" stmt.FormattedText
-    |_ -> ()  
-  { Dialect = MsSqlDialect(); ConnectionProvider =provide; Listener = log }
-
-// transaction workflow
 let workflow = txRequired {
   do! Db.run "
       if exists (select * from dbo.sysobjects where id = object_id(N'Person')) drop table Person;
@@ -28,7 +17,6 @@ let workflow = txRequired {
   let! person = Db.update<Person> { person with Email = "hoge@sample.com" }
   do! Db.delete<Person> person }
 
-// eval transaction workflow
-Tx.eval config workflow |> function
+Util.eval workflow |> function
 | Success ret -> printfn "success: %A\n" ret
 | Failure exn -> printfn "failure: %A\n" exn
